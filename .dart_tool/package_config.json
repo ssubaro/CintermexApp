@@ -86,12 +86,6 @@
       "languageVersion": "3.4"
     },
     {
-      "name": "cupertino_icons",
-      "rootUri": "file:///C:/Users/jose.perez/AppData/Local/Pub/Cache/hosted/pub.dev/cupertino_icons-1.0.8",
-      "packageUri": "lib/",
-      "languageVersion": "3.1"
-    },
-    {
       "name": "dart_jsonwebtoken",
       "rootUri": "file:///C:/Users/jose.perez/AppData/Local/Pub/Cache/hosted/pub.dev/dart_jsonwebtoken-3.3.1",
       "packageUri": "lib/",
@@ -507,7 +501,7 @@
     },
     {
       "name": "url_launcher_ios",
-      "rootUri": "file:///C:/Users/jose.perez/AppData/Local/Pub/Cache/hosted/pub.dev/url_launcher_ios-6.4.0",
+      "rootUri": "file:///C:/Users/jose.perez/AppData/Local/Pub/Cache/hosted/pub.dev/url_launcher_ios-6.4.1",
       "packageUri": "lib/",
       "languageVersion": "3.10"
     },
@@ -593,7 +587,7 @@
       "name": "cintermex_app",
       "rootUri": "../",
       "packageUri": "lib/",
-      "languageVersion": "3.10"
+      "languageVersion": "3.1"
     }
   ],
   "generator": "pub",
