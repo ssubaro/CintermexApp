@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/services/supabase_service.dart';
+import 'package:intl/intl.dart';
 
 class MyTicketsScreen extends StatelessWidget {
   const MyTicketsScreen({super.key});
@@ -43,7 +44,8 @@ class MyTicketsScreen extends StatelessWidget {
               return Card(
                 elevation: 4,
                 margin: const EdgeInsets.only(bottom: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -58,8 +60,20 @@ class MyTicketsScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text("Fecha: ${ticket.eventDate?.toString().split(' ')[0] ?? 'N/A'}"),
-                      Text("Ubicación: ${ticket.eventLocation ?? 'N/A'}"),
+                      Text(
+                        "Fecha: ${DateFormat('EEE, d MMM y', 'es').format(ticket.selectedDate ?? ticket.eventDate ?? DateTime.now())}",
+                        style: const TextStyle(color: Colors.black87),
+                      ),
+                      Text(
+                        "Ubicación: ${ticket.eventLocation ?? 'N/A'}",
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                      Text(
+                        "Cantidad: ${ticket.quantity}",
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryRed),
+                      ),
                       const Divider(),
                       Center(
                         child: Column(

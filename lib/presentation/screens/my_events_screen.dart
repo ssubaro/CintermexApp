@@ -42,11 +42,9 @@ class MyEventsScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final event = events[index];
               return EventCard(
-                title: event.title,
-                date: "${event.startDate.day}/${event.startDate.month}/${event.startDate.year}",
-                location: event.location,
-                imageUrl: event.imageUrl,
+                event: event,
               );
+
             },
           );
         },

@@ -4,8 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_theme.dart';
 import '../../core/constants.dart';
 import '../../data/models/event_model.dart';
+import '../../data/models/category_model.dart';
+import '../../data/services/supabase_service.dart';
 import '../widgets/custom_drawer.dart';
 import '../widgets/event_card.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,53 +18,93 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final SupabaseService _supabaseService = SupabaseService();
+  List<Category> _categories = [];
+  String? _selectedCategoryId;
+  bool _isLoading = true;
+
   final List<String> _bannerImages = [
-    'https://www.ticketopolis.com/files/0f05c982-86f6-4b27-9e91-e3e2057028be/img/2026-02-03T21:34:50.649Z-f9813e2f-404d-4617-96fd-dc40f148ac32_header.jpg',
-    'https://cifam.mx/wp-content/uploads/2025/09/CIFAM_MTY2026Positivo_horizontal@4x-scaled-e1759196025410-1024x406.png',
-    'https://via.placeholder.com/800x400/EC2227/FFFFFF?text=Feria+Del+Libro',
+    'https://i.ytimg.com/vi/sI6fg4q98Is/maxresdefault.jpg',
+    'https://scontent-qro1-2.xx.fbcdn.net/v/t39.30808-6/629656775_1379915637510040_3990866888935312711_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=13d280&_nc_ohc=ElCD4MPmrq8Q7kNvwGpgZeT&_nc_oc=AdmtevaND2nmp8DJL1-31saz59DXHgTgfuZB1Y8a66KF919VYhOQ8bIt76yYyNsorVA&_nc_zt=23&_nc_ht=scontent-qro1-2.xx&_nc_gid=G_S_Guw6vd1F_qzfI67onw&oh=00_AfuH7yIbysGaLaza3kyfUYh5JbTSDVIFueY_9k-LSooRg&oe=69A570E4',
+    'https://tse4.mm.bing.net/th/id/OIP.brloUje5f0mZIwIzCakuAgHaGW?rs=1&pid=ImgDetMain&o=7&rm=3',
   ];
 
   int _selectedMonthIndex = DateTime.now().month - 1; // 0-based index
 
   final List<String> _months = [
-    'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-    'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+    'Ene',
+    'Feb',
+    'Mar',
+    'Abr',
+    'May',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dic'
   ];
 
-  // Stream de eventos desde Supabase
-  final _supabase = Supabase.instance.client;
+  void _updateEvents() {
+    final year = DateTime.now().year;
+    final startOfMonth = DateTime(year, _selectedMonthIndex + 1, 1);
+    final endOfMonth = DateTime(year, _selectedMonthIndex + 2, 0, 23, 59, 59);
 
-  Stream<List<Event>> _getEventsStream(int monthIndex) {
-    final year = DateTime.now().year; // Asumimos año actual
-    final startOfMonth = DateTime(year, monthIndex + 1, 1);
-    final endOfMonth = DateTime(year, monthIndex + 2, 0);
+    _supabaseService.refreshEvents(
+      categoryId: _selectedCategoryId,
+      startDate: startOfMonth,
+      endDate: endOfMonth,
+    );
+  }
 
-    return _supabase
-        .from('events')
-        .stream(primaryKey: ['id'])
-        .order('start_date')
-        .map((data) {
-          final events = data.map((e) => Event.fromJson(e)).toList();
-          // Filtrado manual del stream si no se usa filtro en query directo
-          return events.where((e) => 
-            e.startDate.isAfter(startOfMonth.subtract(const Duration(days: 1))) && 
-            e.startDate.isBefore(endOfMonth.add(const Duration(days: 1)))
-          ).toList();
-        });
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+    _updateEvents();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() => _isLoading = true);
+    try {
+      final futures = await Future.wait([
+        _supabaseService.getCategories(),
+      ]);
+      setState(() {
+        _categories = futures[0] as List<Category>;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching data: $e');
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppConstants.appName, style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(AppConstants.appName,
+            style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const CircleAvatar(
               backgroundColor: AppColors.primaryRed,
               child: Icon(Icons.person, color: Colors.white),
             ),
-            onPressed: () {},
+            onPressed: () {
+              final user = Supabase.instance.client.auth.currentUser;
+              if (user == null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                );
+              } else {
+                // Si ya inició sesión, abrimos el Drawer donde tiene las opciones
+                Scaffold.of(context).openDrawer();
+              }
+            },
           ),
           const SizedBox(width: 8),
         ],
@@ -100,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }).toList(),
             ),
-            
+
             // Month Filter Section
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -109,7 +152,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _months.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 10),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 10),
                   itemBuilder: (context, index) {
                     final isSelected = index == _selectedMonthIndex;
                     return ChoiceChip(
@@ -118,13 +162,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       selectedColor: AppColors.primaryRed,
                       labelStyle: TextStyle(
                         color: isSelected ? Colors.white : Colors.grey,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                       onSelected: (bool selected) {
                         if (selected) {
                           setState(() {
                             _selectedMonthIndex = index;
                           });
+                          _updateEvents();
                         }
                       },
                     );
@@ -133,31 +179,97 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
+            // Category Filter Section
+            if (_isLoading)
+              const Center(
+                  child: CircularProgressIndicator(color: AppColors.primaryRed))
+            else
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: SizedBox(
+                  height: 40,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _categories.length + 1, // +1 for "All" category
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        // "All" category chip
+                        final isSelected = _selectedCategoryId == null;
+                        return ChoiceChip(
+                          label: const Text('Todos'),
+                          selected: isSelected,
+                          selectedColor: AppColors.primaryRed,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : Colors.grey,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                          onSelected: (bool selected) {
+                            if (selected) {
+                              setState(() {
+                                _selectedCategoryId = null;
+                              });
+                              _updateEvents();
+                            }
+                          },
+                        );
+                      }
+                      final category = _categories[index - 1];
+                      final isSelected = _selectedCategoryId == category.id;
+                      return ChoiceChip(
+                        label: Text(category.name),
+                        selected: isSelected,
+                        selectedColor: AppColors.primaryRed,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.grey,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                        onSelected: (bool selected) {
+                          if (selected) {
+                            setState(() {
+                              _selectedCategoryId = category.id;
+                            });
+                            _updateEvents();
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+
             // Events List Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
-                "Eventos de ${_months[_selectedMonthIndex]}",
+                "Eventos de ${_months[_selectedMonthIndex]} ${DateTime.now().year}",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkGrey,
-                ),
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkGrey,
+                    ),
               ),
             ),
 
             // Events List StreamBuilder
             StreamBuilder<List<Event>>(
-              stream: _getEventsStream(_selectedMonthIndex),
+              stream: _supabaseService.eventsStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: Padding(
+                  return const Center(
+                      child: Padding(
                     padding: EdgeInsets.all(20.0),
-                    child: CircularProgressIndicator(color: AppColors.primaryRed),
+                    child:
+                        CircularProgressIndicator(color: AppColors.primaryRed),
                   ));
                 }
-                
+
                 if (snapshot.hasError) {
-                   return Center(child: Text("Error: ${snapshot.error}"));
+                  return Center(child: Text("Error: ${snapshot.error}"));
                 }
 
                 final events = snapshot.data ?? [];
@@ -168,11 +280,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Center(
                       child: Column(
                         children: [
-                          const Icon(Icons.event_busy, size: 48, color: Colors.grey),
+                          const Icon(Icons.event_busy,
+                              size: 48, color: Colors.grey),
                           const SizedBox(height: 16),
                           Text(
                             "No hay eventos para este mes",
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyLarge
+                                ?.copyWith(color: Colors.grey),
                           ),
                         ],
                       ),
@@ -181,17 +297,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
 
                 return ListView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
                   shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: events.length,
                   itemBuilder: (context, index) {
                     final event = events[index];
-                    return EventCard(
-                      title: event.title,
-                      date: "${event.startDate.day} de ${_months[event.startDate.month - 1]}",
-                      location: event.location,
-                      imageUrl: event.imageUrl,
-                    );
+                    return EventCard(event: event);
                   },
                 );
               },
@@ -206,17 +317,34 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      IconButton(icon: const Icon(Icons.facebook, color: Colors.white), onPressed: () {}),
-                      IconButton(icon: const Icon(Icons.add_ic_call_sharp, color: Colors.white), onPressed: () {}),
-                      IconButton(icon: const Icon(Icons.web, color: Colors.white), onPressed: () {}),
+                      IconButton(
+                          icon: const Icon(Icons.facebook, color: Colors.white),
+                          onPressed: () {}),
+                      IconButton(
+                          icon: const Icon(Icons.add_ic_call_sharp,
+                              color: Colors.white),
+                          onPressed: () {}),
+                      IconButton(
+                          icon: const Icon(Icons.web, color: Colors.white),
+                          onPressed: () {}),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  TextButton(onPressed: () {}, child: const Text("Términos y Condiciones", style: TextStyle(color: Colors.white70))),
-                  TextButton(onPressed: () {}, child: const Text("Aviso de Privacidad", style: TextStyle(color: Colors.white70))),
-                  TextButton(onPressed: () {}, child: const Text("Acerca de Nosotros", style: TextStyle(color: Colors.white70))),
+                  TextButton(
+                      onPressed: () {},
+                      child: const Text("Términos y Condiciones",
+                          style: TextStyle(color: Colors.white70))),
+                  TextButton(
+                      onPressed: () {},
+                      child: const Text("Aviso de Privacidad",
+                          style: TextStyle(color: Colors.white70))),
+                  TextButton(
+                      onPressed: () {},
+                      child: const Text("Acerca de Nosotros",
+                          style: TextStyle(color: Colors.white70))),
                   const SizedBox(height: 10),
-                  const Text("© 2026 Cintermex. Todos los derechos reservados.", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  const Text("© 2026 Cintermex. Todos los derechos reservados.",
+                      style: TextStyle(color: Colors.white54, fontSize: 12)),
                 ],
               ),
             ),
