@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../data/models/event_model.dart';
 import '../../data/models/ticket_type_model.dart';
-import '../../data/models/order_model.dart';
 import '../../data/services/supabase_service.dart';
 import '../../core/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'my_tickets_screen.dart';
 
 class PurchaseScreen extends StatefulWidget {
   final Event event;
@@ -17,7 +17,9 @@ class PurchaseScreen extends StatefulWidget {
 }
 
 class _PurchaseScreenState extends State<PurchaseScreen> {
+  static const int MAX_TICKETS_PER_USER = 6;
   int _quantity = 1;
+  int _alreadyOwnedCount = 0;
   DateTime? _selectedDate;
   List<TicketType> _ticketTypes = [];
   TicketType? _selectedTicketType;
@@ -34,21 +36,39 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
     if (_availableDays.isNotEmpty) {
       _selectedDate = _availableDays.first;
     }
-    _fetchTicketTypes();
+    _fetchInitialData();
   }
 
-  Future<void> _fetchTicketTypes() async {
+  Future<void> _fetchInitialData() async {
     try {
-      final types = await _supabaseService.getTicketTypes(widget.event.id);
+      final results = await Future.wait([
+        _supabaseService.getTicketTypes(widget.event.id),
+        _supabaseService.getEventTicketCount(widget.event.id),
+      ]);
+
+      final types = results[0] as List<TicketType>;
+      final ownedCount = results[1] as int;
+
       setState(() {
         _ticketTypes = types;
+        _alreadyOwnedCount = ownedCount;
+        
         if (_ticketTypes.isNotEmpty) {
           _selectedTicketType = _ticketTypes.first;
         }
+
+        // Si ya tiene boletos, ajustar la cantidad inicial si es necesario
+        int remaining = MAX_TICKETS_PER_USER - _alreadyOwnedCount;
+        if (remaining <= 0) {
+          _quantity = 0;
+        } else if (_quantity > remaining) {
+          _quantity = remaining;
+        }
+
         _isLoadingTypes = false;
       });
     } catch (e) {
-      print('Error fetching ticket types: $e');
+      print('Error fetching initial data: $e');
       setState(() => _isLoadingTypes = false);
     }
   }
@@ -57,8 +77,13 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
   double get _totalPrice => _unitPrice * _quantity;
 
   void _increment() {
-    if (_quantity < 10) {
+    int remaining = MAX_TICKETS_PER_USER - _alreadyOwnedCount;
+    if (_quantity < remaining) {
       setState(() => _quantity++);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Límite máximo de $MAX_TICKETS_PER_USER boletos por cuenta alcanzado.')),
+      );
     }
   }
 
@@ -98,12 +123,18 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
         orderId: order.id,
       );
 
+      // Obtener el nombre real del usuario del perfil
+      final profile = await _supabaseService.getProfile(user.id);
+      final customerName = profile?['full_name'] ?? profile?['display_name'] ?? 'Cliente Cintermex';
+      final ticketTypeName = _selectedTicketType?.name ?? 'General';
+
       final checkoutUrl = await _supabaseService.createConektaCheckout(
         eventId: widget.event.id,
-        eventTitle: widget.event.title,
+        eventTitle: '${widget.event.title} - $ticketTypeName',
         unitPrice: _unitPrice,
         quantity: _quantity,
         customerEmail: user.email ?? '',
+        customerName: customerName,
         userId: user.id,
         selectedDate: _selectedDate!.toIso8601String(),
       );
@@ -113,26 +144,59 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
 
         if (mounted) {
-          showDialog(
+          await showDialog(
             context: context,
-            builder: (context) => AlertDialog(
+            barrierDismissible: false,
+            builder: (context) => Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               backgroundColor: AppColors.darkGrey,
-              title: const Text('Pago en proceso',
-                  style: TextStyle(color: Colors.white)),
-              content: const Text(
-                'Se ha abierto la página de pago de Conekta. Una vez completado, tus boletos aparecerán en "Mis Boletos".',
-                style: TextStyle(color: Colors.white70),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('ENTENDIDO',
-                      style: TextStyle(color: AppColors.primaryRed)),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.payment, size: 60, color: Colors.blueAccent),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      '¡Pago en proceso!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Se ha abierto la página de pago de Conekta. Una vez que lo realices, tus boletos aparecerán en tu sección personal.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryRed,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('IR A MIS BOLETOS', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           );
         }
@@ -292,20 +356,49 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildQuantityButton(Icons.remove, _decrement),
+                      _buildQuantityButton(
+                        Icons.remove, 
+                        (_alreadyOwnedCount >= MAX_TICKETS_PER_USER || _quantity <= 1) ? null : _decrement
+                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 32.0),
                         child: Text(
                           '$_quantity',
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white),
+                              color: (_alreadyOwnedCount >= MAX_TICKETS_PER_USER) ? Colors.grey : Colors.white),
                         ),
                       ),
-                      _buildQuantityButton(Icons.add, _increment),
+                      _buildQuantityButton(
+                        Icons.add, 
+                        (_alreadyOwnedCount >= MAX_TICKETS_PER_USER) ? null : _increment
+                      ),
                     ],
                   ),
+                  
+                  if (_alreadyOwnedCount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Center(
+                        child: Text(
+                          'Ya tienes $_alreadyOwnedCount boletos para este evento.',
+                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      ),
+                    ),
+
+                  if (_alreadyOwnedCount >= MAX_TICKETS_PER_USER)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: Center(
+                        child: Text(
+                          'Has alcanzado el límite de $MAX_TICKETS_PER_USER boletos por cuenta.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.primaryRed, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
 
                   const SizedBox(height: 40),
 
@@ -356,7 +449,9 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _isProcessing ? null : _handlePurchase,
+                      onPressed: (_isProcessing || _alreadyOwnedCount >= MAX_TICKETS_PER_USER || _quantity == 0) 
+                          ? null 
+                          : _handlePurchase,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryRed,
                         foregroundColor: Colors.white,
@@ -384,17 +479,18 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
     );
   }
 
-  Widget _buildQuantityButton(IconData icon, VoidCallback onPressed) {
+  Widget _buildQuantityButton(IconData icon, VoidCallback? onPressed) {
+    bool isEnabled = onPressed != null;
     return InkWell(
       onTap: onPressed,
       borderRadius: BorderRadius.circular(30),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white24),
+          border: Border.all(color: isEnabled ? Colors.white24 : Colors.white12),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: Colors.white, size: 28),
+        child: Icon(icon, color: isEnabled ? Colors.white : Colors.white30, size: 28),
       ),
     );
   }

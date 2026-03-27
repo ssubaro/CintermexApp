@@ -22,6 +22,12 @@ class Event {
   final String status;
   final bool isFeatured;
   final String? externalTicketUrl;
+  final String? organizerId;
+
+
+  // Virtual fields / Flags
+  bool isTicket;
+  bool isSaved;
 
   // Virtual fields / Joins
   final VenueLocation? venue;
@@ -48,9 +54,13 @@ class Event {
     this.status = 'active',
     this.isFeatured = false,
     this.externalTicketUrl,
+    this.organizerId,
     this.venue,
+
     this.schedules,
     this.categoriesList,
+    this.isTicket = false,
+    this.isSaved = false,
   });
 
   factory Event.fromJson(Map<String, dynamic> json) {
@@ -74,6 +84,8 @@ class Event {
       status: json['status'] ?? 'active',
       isFeatured: json['is_featured'] ?? false,
       externalTicketUrl: json['external_ticket_url'] as String?,
+      organizerId: json['organizer_id'] as String?,
+
       venue: json['venue_locations'] != null
           ? VenueLocation.fromJson(json['venue_locations'])
           : null,
@@ -103,7 +115,10 @@ class Event {
       'category_id': categoryId,
       'price': price,
       'capacity': capacity,
+      'status': status,
+      'organizer_id': organizerId,
     };
+
   }
 
   List<DateTime> getDaysList() {
