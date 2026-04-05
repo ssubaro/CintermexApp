@@ -99,10 +99,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showMultiSelectCategories() {
     String searchQuery = '';
-    
+
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Esto es super importante para que el teclado no tape el menú
+      isScrollControlled:
+          true, // Esto es super importante para que el teclado no tape el menú
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -111,8 +112,10 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, setModalState) {
             // Filtrar categorias en tiempo real
             final currentCategories = _categories.where((cat) {
-              return cat.name.toLowerCase().contains(searchQuery.toLowerCase()) || 
-                     cat.slug.toLowerCase().contains(searchQuery.toLowerCase());
+              return cat.name
+                      .toLowerCase()
+                      .contains(searchQuery.toLowerCase()) ||
+                  cat.slug.toLowerCase().contains(searchQuery.toLowerCase());
             }).toList();
 
             return Padding(
@@ -144,7 +147,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             setState(() {});
                             _updateEvents();
                           },
-                          child: const Text('Limpiar', style: TextStyle(color: Colors.grey)),
+                          child: const Text('Limpiar',
+                              style: TextStyle(color: Colors.grey)),
                         )
                       ],
                     ),
@@ -158,7 +162,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       decoration: InputDecoration(
                         hintText: 'Buscar categoría...',
-                        prefixIcon: const Icon(Icons.search, color: AppColors.primaryRed),
+                        prefixIcon: const Icon(Icons.search,
+                            color: AppColors.primaryRed),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: Colors.grey.shade300),
@@ -169,39 +174,44 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.primaryRed),
+                          borderSide:
+                              const BorderSide(color: AppColors.primaryRed),
                         ),
                         contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       ),
                     ),
                     const SizedBox(height: 12),
                     Expanded(
-                      child: currentCategories.isEmpty 
-                        ? const Center(child: Text('No se encontraron categorías', style: TextStyle(color: Colors.grey))) 
-                        : ListView.builder(
-                          itemCount: currentCategories.length,
-                          itemBuilder: (context, index) {
-                            final cat = currentCategories[index];
-                            final isSelected = _selectedCategoryIds.contains(cat.id);
-                            return CheckboxListTile(
-                              title: Text(cat.slug, style: const TextStyle(fontSize: 16)),
-                              value: isSelected,
-                              activeColor: AppColors.primaryRed,
-                              contentPadding: EdgeInsets.zero,
-                              onChanged: (val) {
-                                setModalState(() {
-                                  if (val == true) {
-                                    _selectedCategoryIds.add(cat.id);
-                                  } else {
-                                    _selectedCategoryIds.remove(cat.id);
-                                  }
-                                });
-                                setState(() {}); // Update main UI
-                                _updateEvents(); // Fetch new data
+                      child: currentCategories.isEmpty
+                          ? const Center(
+                              child: Text('No se encontraron categorías',
+                                  style: TextStyle(color: Colors.grey)))
+                          : ListView.builder(
+                              itemCount: currentCategories.length,
+                              itemBuilder: (context, index) {
+                                final cat = currentCategories[index];
+                                final isSelected =
+                                    _selectedCategoryIds.contains(cat.id);
+                                return CheckboxListTile(
+                                  title: Text(cat.slug,
+                                      style: const TextStyle(fontSize: 16)),
+                                  value: isSelected,
+                                  activeColor: AppColors.primaryRed,
+                                  contentPadding: EdgeInsets.zero,
+                                  onChanged: (val) {
+                                    setModalState(() {
+                                      if (val == true) {
+                                        _selectedCategoryIds.add(cat.id);
+                                      } else {
+                                        _selectedCategoryIds.remove(cat.id);
+                                      }
+                                    });
+                                    setState(() {}); // Update main UI
+                                    _updateEvents(); // Fetch new data
+                                  },
+                                );
                               },
-                            );
-                          },
-                        ),
+                            ),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -210,10 +220,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryRed,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Cerrar', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: const Text('Cerrar',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -250,12 +265,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (user == null) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreen()),
                   );
                 } else {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const ProfileScreen()),
                   );
                 }
               },
@@ -307,14 +324,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     margin: const EdgeInsets.only(right: 12),
                     decoration: BoxDecoration(
-                      color: (_selectedMonthIndex == null) 
-                          ? AppColors.primaryRed 
+                      color: (_selectedMonthIndex == null)
+                          ? AppColors.primaryRed
                           : Colors.grey.withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
                       icon: Icon(
-                        Icons.filter_alt_off, 
+                        Icons.filter_alt_off,
                         color: (_selectedMonthIndex == null)
                             ? Colors.white
                             : Colors.white70,
@@ -342,12 +359,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             label: Text(_months[index]),
                             selected: isSelected,
                             selectedColor: AppColors.primaryRed,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
                             labelStyle: TextStyle(
                               fontSize: 16,
                               color: isSelected ? Colors.white : Colors.grey,
-                              fontWeight:
-                                  isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                             onSelected: (bool selected) {
                               if (selected) {
@@ -403,12 +422,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 label: const Text('Todos'),
                                 selected: isSelected,
                                 selectedColor: AppColors.primaryRed,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                                 labelStyle: TextStyle(
                                   fontSize: 14,
-                                  color: isSelected ? Colors.white : Colors.grey,
-                                  fontWeight:
-                                      isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color:
+                                      isSelected ? Colors.white : Colors.grey,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                                 onSelected: (bool selected) {
                                   if (selected) {
@@ -421,17 +443,20 @@ class _HomeScreenState extends State<HomeScreen> {
                               );
                             }
                             final category = _categories[index - 1];
-                            final isSelected = _selectedCategoryIds.contains(category.id);
+                            final isSelected =
+                                _selectedCategoryIds.contains(category.id);
                             return ChoiceChip(
                               label: Text(category.slug),
                               selected: isSelected,
                               selectedColor: AppColors.primaryRed,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
                               labelStyle: TextStyle(
                                 fontSize: 14,
                                 color: isSelected ? Colors.white : Colors.grey,
-                                fontWeight:
-                                    isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                               onSelected: (bool selected) {
                                 setState(() {
@@ -456,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
-                _selectedMonthIndex != null 
+                _selectedMonthIndex != null
                     ? "Eventos de ${_months[_selectedMonthIndex!]} $_selectedYear"
                     : "Todos los eventos",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
