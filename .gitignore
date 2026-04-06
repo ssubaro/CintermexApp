@@ -49,3 +49,18 @@ google-services.json
 # Environment variables
 .env
 analyze_output.txt
+
+# Gradle related
+.gradle/
+android/.gradle/
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Local project files
+.metadata
+analysis_options.yaml
+
+# Supabase
+supabase/.temp/

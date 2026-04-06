@@ -9,6 +9,7 @@ import '../../data/services/supabase_service.dart';
 import '../widgets/custom_drawer.dart';
 import '../widgets/event_card.dart';
 import 'login_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,7 +21,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final SupabaseService _supabaseService = SupabaseService();
   List<Category> _categories = [];
-  String? _selectedCategoryId;
+  List<String> _selectedCategoryIds = [];
   bool _isLoading = true;
 
   final List<String> _bannerImages = [
@@ -29,7 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
     'https://tse4.mm.bing.net/th/id/OIP.brloUje5f0mZIwIzCakuAgHaGW?rs=1&pid=ImgDetMain&o=7&rm=3',
   ];
 
-  int _selectedMonthIndex = DateTime.now().month - 1; // 0-based index
+  int? _selectedMonthIndex = DateTime.now().month - 1; // 0-based index
+  int _selectedYear = DateTime.now().year;
 
   final List<String> _months = [
     'Ene',
@@ -47,14 +49,28 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   void _updateEvents() {
-    final year = DateTime.now().year;
-    final startOfMonth = DateTime(year, _selectedMonthIndex + 1, 1);
-    final endOfMonth = DateTime(year, _selectedMonthIndex + 2, 0, 23, 59, 59);
+    DateTime? start;
+    DateTime? end;
+
+    if (_selectedMonthIndex != null) {
+      final now = DateTime.now();
+      _selectedYear = now.year;
+      final selectedMonth = _selectedMonthIndex! + 1; // 1-based
+
+      // Si el mes seleccionado ya pasó en el año actual, buscamos en el siguiente año
+      if (selectedMonth < now.month) {
+        _selectedYear++;
+      }
+
+      start = DateTime(_selectedYear, selectedMonth, 1);
+      // El día 0 del mes siguiente es el último día del mes actual
+      end = DateTime(_selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+    }
 
     _supabaseService.refreshEvents(
-      categoryId: _selectedCategoryId,
-      startDate: startOfMonth,
-      endDate: endOfMonth,
+      categoryIds: _selectedCategoryIds.isEmpty ? null : _selectedCategoryIds,
+      startDate: start,
+      endDate: end,
     );
   }
 
@@ -72,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _supabaseService.getCategories(),
       ]);
       setState(() {
-        _categories = futures[0] as List<Category>;
+        _categories = futures[0];
         _isLoading = false;
       });
     } catch (e) {
@@ -81,30 +97,186 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showMultiSelectCategories() {
+    String searchQuery = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled:
+          true, // Esto es super importante para que el teclado no tape el menú
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // Filtrar categorias en tiempo real
+            final currentCategories = _categories.where((cat) {
+              return cat.name
+                      .toLowerCase()
+                      .contains(searchQuery.toLowerCase()) ||
+                  cat.slug.toLowerCase().contains(searchQuery.toLowerCase());
+            }).toList();
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                height: MediaQuery.of(context).size.height * 0.7,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Seleccionar Categorías',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryRed),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setModalState(() {
+                              _selectedCategoryIds.clear();
+                              searchQuery = ''; // Limpiar la busqueda
+                            });
+                            setState(() {});
+                            _updateEvents();
+                          },
+                          child: const Text('Limpiar',
+                              style: TextStyle(color: Colors.grey)),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Búsqueda
+                    TextField(
+                      onChanged: (value) {
+                        setModalState(() {
+                          searchQuery = value;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Buscar categoría...',
+                        prefixIcon: const Icon(Icons.search,
+                            color: AppColors.primaryRed),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: AppColors.primaryRed),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: currentCategories.isEmpty
+                          ? const Center(
+                              child: Text('No se encontraron categorías',
+                                  style: TextStyle(color: Colors.grey)))
+                          : ListView.builder(
+                              itemCount: currentCategories.length,
+                              itemBuilder: (context, index) {
+                                final cat = currentCategories[index];
+                                final isSelected =
+                                    _selectedCategoryIds.contains(cat.id);
+                                return CheckboxListTile(
+                                  title: Text(cat.slug,
+                                      style: const TextStyle(fontSize: 16)),
+                                  value: isSelected,
+                                  activeColor: AppColors.primaryRed,
+                                  contentPadding: EdgeInsets.zero,
+                                  onChanged: (val) {
+                                    setModalState(() {
+                                      if (val == true) {
+                                        _selectedCategoryIds.add(cat.id);
+                                      } else {
+                                        _selectedCategoryIds.remove(cat.id);
+                                      }
+                                    });
+                                    setState(() {}); // Update main UI
+                                    _updateEvents(); // Fetch new data
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryRed,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cerrar',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppConstants.appName,
             style: TextStyle(fontWeight: FontWeight.bold)),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
-          IconButton(
-            icon: const CircleAvatar(
-              backgroundColor: AppColors.primaryRed,
-              child: Icon(Icons.person, color: Colors.white),
+          Builder(
+            builder: (context) => IconButton(
+              icon: const CircleAvatar(
+                backgroundColor: AppColors.primaryRed,
+                child: Icon(Icons.person, color: Colors.white),
+              ),
+              onPressed: () {
+                final user = Supabase.instance.client.auth.currentUser;
+                if (user == null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreen()),
+                  );
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const ProfileScreen()),
+                  );
+                }
+              },
             ),
-            onPressed: () {
-              final user = Supabase.instance.client.auth.currentUser;
-              if (user == null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
-              } else {
-                // Si ya inició sesión, abrimos el Drawer donde tiene las opciones
-                Scaffold.of(context).openDrawer();
-              }
-            },
           ),
           const SizedBox(width: 8),
         ],
@@ -147,35 +319,69 @@ class _HomeScreenState extends State<HomeScreen> {
             // Month Filter Section
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: SizedBox(
-                height: 50,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _months.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    final isSelected = index == _selectedMonthIndex;
-                    return ChoiceChip(
-                      label: Text(_months[index]),
-                      selected: isSelected,
-                      selectedColor: AppColors.primaryRed,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : Colors.grey,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
+              child: Row(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      color: (_selectedMonthIndex == null)
+                          ? AppColors.primaryRed
+                          : Colors.grey.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.filter_alt_off,
+                        color: (_selectedMonthIndex == null)
+                            ? Colors.white
+                            : Colors.white70,
                       ),
-                      onSelected: (bool selected) {
-                        if (selected) {
-                          setState(() {
-                            _selectedMonthIndex = index;
-                          });
-                          _updateEvents();
-                        }
+                      tooltip: 'Todos los meses',
+                      onPressed: () {
+                        setState(() {
+                          _selectedMonthIndex = null;
+                        });
+                        _updateEvents();
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                  Expanded(
+                    child: SizedBox(
+                      height: 56,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _months.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final isSelected = index == _selectedMonthIndex;
+                          return ChoiceChip(
+                            label: Text(_months[index]),
+                            selected: isSelected,
+                            selectedColor: AppColors.primaryRed,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            labelStyle: TextStyle(
+                              fontSize: 16,
+                              color: isSelected ? Colors.white : Colors.grey,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                            onSelected: (bool selected) {
+                              if (selected) {
+                                setState(() {
+                                  _selectedMonthIndex = index;
+                                });
+                                _updateEvents();
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -187,59 +393,87 @@ class _HomeScreenState extends State<HomeScreen> {
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: SizedBox(
-                  height: 40,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _categories.length + 1, // +1 for "All" category
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(width: 10),
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        // "All" category chip
-                        final isSelected = _selectedCategoryId == null;
-                        return ChoiceChip(
-                          label: const Text('Todos'),
-                          selected: isSelected,
-                          selectedColor: AppColors.primaryRed,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                          onSelected: (bool selected) {
-                            if (selected) {
-                              setState(() {
-                                _selectedCategoryId = null;
-                              });
-                              _updateEvents();
+                child: Row(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(right: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.checklist, color: Colors.white),
+                        tooltip: 'Filtro avanzado',
+                        onPressed: _showMultiSelectCategories,
+                      ),
+                    ),
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _categories.length + 1,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(width: 10),
+                          itemBuilder: (context, index) {
+                            if (index == 0) {
+                              final isSelected = _selectedCategoryIds.isEmpty;
+                              return ChoiceChip(
+                                label: const Text('Todos'),
+                                selected: isSelected,
+                                selectedColor: AppColors.primaryRed,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                labelStyle: TextStyle(
+                                  fontSize: 14,
+                                  color:
+                                      isSelected ? Colors.white : Colors.grey,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                                onSelected: (bool selected) {
+                                  if (selected) {
+                                    setState(() {
+                                      _selectedCategoryIds.clear();
+                                    });
+                                    _updateEvents();
+                                  }
+                                },
+                              );
                             }
+                            final category = _categories[index - 1];
+                            final isSelected =
+                                _selectedCategoryIds.contains(category.id);
+                            return ChoiceChip(
+                              label: Text(category.slug),
+                              selected: isSelected,
+                              selectedColor: AppColors.primaryRed,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              labelStyle: TextStyle(
+                                fontSize: 14,
+                                color: isSelected ? Colors.white : Colors.grey,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                              onSelected: (bool selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedCategoryIds.add(category.id);
+                                  } else {
+                                    _selectedCategoryIds.remove(category.id);
+                                  }
+                                });
+                                _updateEvents();
+                              },
+                            );
                           },
-                        );
-                      }
-                      final category = _categories[index - 1];
-                      final isSelected = _selectedCategoryId == category.id;
-                      return ChoiceChip(
-                        label: Text(category.name),
-                        selected: isSelected,
-                        selectedColor: AppColors.primaryRed,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
                         ),
-                        onSelected: (bool selected) {
-                          if (selected) {
-                            setState(() {
-                              _selectedCategoryId = category.id;
-                            });
-                            _updateEvents();
-                          }
-                        },
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -247,7 +481,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
-                "Eventos de ${_months[_selectedMonthIndex]} ${DateTime.now().year}",
+                _selectedMonthIndex != null
+                    ? "Eventos de ${_months[_selectedMonthIndex!]} $_selectedYear"
+                    : "Todos los eventos",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppColors.darkGrey,

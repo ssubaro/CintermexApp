@@ -5,6 +5,9 @@ import '../models/ticket_model.dart';
 import '../models/category_model.dart';
 import '../models/ticket_type_model.dart';
 import '../models/order_model.dart';
+import '../models/venue_model.dart';
+
+
 
 class SupabaseService {
   final SupabaseClient _client = Supabase.instance.client;
@@ -15,13 +18,13 @@ class SupabaseService {
   Stream<List<Event>> get eventsStream => _eventsSubject.stream;
 
   Future<void> refreshEvents({
-    String? categoryId,
+    List<String>? categoryIds,
     DateTime? startDate,
     DateTime? endDate,
   }) async {
     try {
       final events = await getEvents(
-        categoryId: categoryId,
+        categoryIds: categoryIds,
         startDate: startDate,
         endDate: endDate,
       );
@@ -47,25 +50,93 @@ class SupabaseService {
     );
   }
 
-  Future<AuthResponse> signUp(
-      String email, String password, String role) async {
+  /// Envía el email de recuperación de contraseña.
+  Future<void> resetPasswordForEmail(String email) async {
+    await _client.auth.resetPasswordForEmail(email);
+  }
+
+  /// Establece una nueva contraseña cuando el usuario ya tiene sesión activa
+  /// (después de seguir el link del email de recuperación).
+  Future<void> updatePasswordWithToken(String newPassword) async {
+    await _client.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
+  }
+
+  /// Crea un nuevo usuario mediante una Edge Function (solo para admins)
+  /// Esto evita que el administrador pierda su sesión actual.
+  Future<void> adminCreateUser({
+    required String email,
+    required String password,
+    required String role,
+    String? fullName,
+  }) async {
+    final session = _client.auth.currentSession;
+    if (session == null) throw Exception('No hay sesión activa');
+
+    final response = await _client.functions.invoke(
+      'admin-create-user',
+      body: {
+        'email': email,
+        'password': password,
+        'role': role,
+        'full_name': fullName,
+      },
+    );
+
+    if (response.status != 200) {
+      throw Exception('Error al crear usuario: ${response.data['error'] ?? 'Desconocido'}');
+    }
+  }
+
+  Future<AuthResponse> signUp({
+    required String email,
+    required String password,
+    required String role,
+    String? fullName,
+    String? displayName,
+    String? phone,
+    List<String>? selectedCategoryIds,
+  }) async {
+    // Pasamos todos los datos como metadata para que el trigger de Supabase
+    // los pueda leer automáticamente al confirmar el correo.
     final response = await _client.auth.signUp(
       email: email,
       password: password,
+      data: {
+        'role': role,
+        if (fullName != null && fullName.isNotEmpty) 'full_name': fullName,
+        if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+      },
     );
 
-    // Si el registro es exitoso y tenemos un usuario, insertamos su perfil con el rol
+    // También intentamos insertar el perfil directamente (por si el trigger no está activo
+    // o si la confirmación de correo está desactivada).
     final user = response.user;
     if (user != null) {
       try {
-        await _client.from('profiles').insert({
+        await _client.from('profiles').upsert({
           'id': user.id,
           'email': email,
           'role': role,
+          if (fullName != null && fullName.isNotEmpty) 'full_name': fullName,
+          if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+          if (phone != null && phone.isNotEmpty) 'phone': phone,
         });
+
+        // Insertar intereses si hay
+        if (selectedCategoryIds != null && selectedCategoryIds.isNotEmpty) {
+          final interestsData = selectedCategoryIds.map((categoryId) => {
+            'user_id': user.id,
+            'category_id': categoryId,
+          }).toList();
+          await _client.from('user_interests').insert(interestsData);
+        }
       } catch (e) {
-        // En un caso real, querrías manejar este error (ej: borrar el auth.user si el perfil falla)
-        print('Error creating profile: $e');
+        // El insert puede fallar si RLS bloquea la escritura antes de confirmación.
+        // El trigger de Supabase lo compensará al confirmar el correo.
+        print('Note: Direct profile insert failed (expected if email confirm pending): $e');
       }
     }
 
@@ -90,14 +161,94 @@ class SupabaseService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getAllProfiles() async {
+    final response = await _client.from('profiles').select().order('created_at');
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  Future<void> updateUserRole(String userId, String newRole) async {
+    await _client.from('profiles').update({'role': newRole}).eq('id', userId);
+  }
+
+  Future<void> updateProfile({
+    required String userId,
+    String? fullName,
+    String? displayName,
+    String? phone,
+  }) async {
+    await _client.from('profiles').update({
+      if (fullName != null) 'full_name': fullName,
+      if (displayName != null) 'display_name': displayName,
+      if (phone != null) 'phone': phone,
+    }).eq('id', userId);
+  }
+
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final email = _client.auth.currentUser?.email;
+    if (email == null) throw Exception('No hay sesión activa');
+    
+    // Re-autenticar para verificar contraseña actual
+    await _client.auth.signInWithPassword(email: email, password: currentPassword);
+    // Cambiar contraseña
+    await _client.auth.updateUser(UserAttributes(password: newPassword));
+  }
+
+  Future<void> deleteAccount() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('No hay sesión activa');
+    
+    // Borrar intereses
+    await _client.from('user_interests').delete().eq('user_id', userId);
+    // Borrar perfil (el usuario queda sin acceso)
+    await _client.from('profiles').delete().eq('id', userId);
+    // Cerrar sesión
+    await _client.auth.signOut();
+  }
+
+  Future<List<String>> getUserInterests(String userId) async {
+    final response = await _client
+        .from('user_interests')
+        .select('category_id')
+        .eq('user_id', userId);
+    final data = response;
+    return data.map((item) => item['category_id'] as String).toList();
+  }
+
+  Future<void> updateUserInterests(String userId, List<String> categoryIds) async {
+    // 1. Eliminar intereses actuales
+    await _client.from('user_interests').delete().eq('user_id', userId);
+
+    // 2. Insertar nuevos intereses
+    if (categoryIds.isNotEmpty) {
+      final interestsData = categoryIds.map((categoryId) => {
+        'user_id': userId,
+        'category_id': categoryId,
+      }).toList();
+      
+      await _client.from('user_interests').insert(interestsData);
+    }
+  }
+
+  Future<Map<String, dynamic>?> getProfile(String userId) async {
+    final response = await _client
+        .from('profiles')
+        .select()
+        .eq('id', userId)
+        .maybeSingle();
+    return response;
+  }
+
   // --- Events & Tickets ---
 
   Future<List<Event>> getEvents({
-    String? categoryId,
+    List<String>? categoryIds,
     DateTime? startDate,
     DateTime? endDate,
   }) async {
-    String eventCategoriesSelect = categoryId != null
+    String eventCategoriesSelect = (categoryIds != null && categoryIds.isNotEmpty)
         ? 'event_categories!inner(category_id, categories(*))'
         : 'event_categories(categories(*))';
 
@@ -108,8 +259,8 @@ class SupabaseService {
           $eventCategoriesSelect
         ''');
 
-    if (categoryId != null) {
-      query = query.eq('event_categories.category_id', categoryId);
+    if (categoryIds != null && categoryIds.isNotEmpty) {
+      query = query.inFilter('event_categories.category_id', categoryIds);
     }
 
     if (startDate != null) {
@@ -174,20 +325,100 @@ class SupabaseService {
     return data.map((json) => Ticket.fromJson(json)).toList();
   }
 
-  // Eventos donde el usuario tiene tickets
+  Future<int> getEventTicketCount(String eventId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return 0;
+
+    final response = await _client
+        .from('tickets')
+        .select('quantity')
+        .eq('user_id', userId)
+        .eq('event_id', eventId);
+    
+    final data = response as List<dynamic>;
+    int count = 0;
+    for (var item in data) {
+      count += (item['quantity'] as int? ?? 0);
+    }
+    return count;
+  }
+
+  // Eventos donde el usuario tiene tickets O los ha guardado
   Future<List<Event>> getMyEvents() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return [];
 
-    final response =
+    // 1. Obtener eventos con tickets
+    final ticketResponse =
         await _client.from('tickets').select('events(*)').eq('user_id', userId);
+    
+    // 2. Obtener eventos guardados
+    final savedResponse = 
+        await _client.from('saved_events').select('events(*)').eq('user_id', userId);
 
-    final data = response as List<dynamic>;
-    // Extraemos el objeto 'events' y lo convertimos, eliminando duplicados
-    final events =
-        data.map((json) => Event.fromJson(json['events'])).toSet().toList();
+    final List<dynamic> ticketData = ticketResponse as List<dynamic>;
+    final List<dynamic> savedData = savedResponse as List<dynamic>;
 
-    return events;
+    // Combinar y eliminar duplicados usando el ID del evento
+    final Map<String, Event> allEvents = {};
+
+    for (var item in ticketData) {
+      if (item['events'] != null) {
+        final event = Event.fromJson(item['events']);
+        event.isTicket = true;
+        allEvents[event.id] = event;
+      }
+    }
+
+    for (var item in savedData) {
+      if (item['events'] != null) {
+        final eventId = item['events']['id'] as String;
+        if (allEvents.containsKey(eventId)) {
+          allEvents[eventId]!.isSaved = true;
+        } else {
+          final event = Event.fromJson(item['events']);
+          event.isSaved = true;
+          allEvents[event.id] = event;
+        }
+      }
+    }
+
+    return allEvents.values.toList()
+      ..sort((a, b) => a.startDate.compareTo(b.startDate));
+  }
+
+  Future<bool> isEventSaved(String eventId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return false;
+
+    final response = await _client
+        .from('saved_events')
+        .select()
+        .eq('user_id', userId)
+        .eq('event_id', eventId)
+        .maybeSingle();
+    
+    return response != null;
+  }
+
+  Future<void> toggleSaveEvent(String eventId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Inicia sesión para guardar eventos');
+
+    final isSaved = await isEventSaved(eventId);
+
+    if (isSaved) {
+      await _client
+          .from('saved_events')
+          .delete()
+          .eq('user_id', userId)
+          .eq('event_id', eventId);
+    } else {
+      await _client.from('saved_events').insert({
+        'user_id': userId,
+        'event_id': eventId,
+      });
+    }
   }
 
   Future<Order> createOrder({
@@ -258,6 +489,7 @@ class SupabaseService {
     required double unitPrice,
     required int quantity,
     required String customerEmail,
+    required String customerName,
     required String userId,
     required String selectedDate,
   }) async {
@@ -267,15 +499,13 @@ class SupabaseService {
 
       final response = await _client.functions.invoke(
         'create-conekta-checkout',
-        headers: {
-          'Authorization': 'Bearer ${session.accessToken}',
-        },
         body: {
           'event_id': eventId,
           'event_title': eventTitle,
           'unit_price': unitPrice,
           'quantity': quantity,
           'customer_email': customerEmail,
+          'customer_name': customerName,
           'user_id': userId,
           'selected_date': selectedDate,
         },
@@ -293,5 +523,102 @@ class SupabaseService {
       print('Error en createConektaCheckout: $e');
       rethrow;
     }
+  }
+
+  // --- Organizer & Admin Extension ---
+
+  Future<List<Event>> getOrganizerEvents(String organizerId) async {
+    final response = await _client
+        .from('events')
+        .select('*, venue_locations(*), event_schedules(*), event_categories(categories(*))')
+        .eq('organizer_id', organizerId)
+        .order('start_date', ascending: true);
+
+    final data = response as List<dynamic>;
+    return data.map((json) => Event.fromJson(json)).toList();
+  }
+
+  Future<List<Event>> getPendingEvents() async {
+    final response = await _client
+        .from('events')
+        .select('*, venue_locations(*), event_schedules(*), event_categories(categories(*))')
+        .eq('status', 'pending')
+        .order('start_date', ascending: true);
+
+    final data = response as List<dynamic>;
+    return data.map((json) => Event.fromJson(json)).toList();
+  }
+
+  Future<void> updateEventStatus(String eventId, String status) async {
+    await _client.from('events').update({'status': status}).eq('id', eventId);
+  }
+
+  Future<Event> saveEvent({
+    required Map<String, dynamic> eventData,
+    List<String>? categoryIds,
+    List<Map<String, dynamic>>? schedules,
+  }) async {
+    final isNew = eventData['id'] == null;
+    
+    dynamic response;
+    if (isNew) {
+      response = await _client.from('events').insert(eventData).select().single();
+    } else {
+      response = await _client
+          .from('events')
+          .update(eventData)
+          .eq('id', eventData['id'])
+          .select()
+          .single();
+    }
+
+    final eventId = response['id'] as String;
+
+    // Handle categories
+    if (categoryIds != null) {
+      // Clear old categories if updating
+      if (!isNew) {
+        await _client.from('event_categories').delete().eq('event_id', eventId);
+      }
+      
+      if (categoryIds.isNotEmpty) {
+        final catData = categoryIds.map((catId) => {
+          'event_id': eventId,
+          'category_id': catId,
+        }).toList();
+        await _client.from('event_categories').insert(catData);
+      }
+    }
+
+    // Handle schedules
+    if (schedules != null) {
+      // Clear old schedules if updating
+      if (!isNew) {
+        await _client.from('event_schedules').delete().eq('event_id', eventId);
+      }
+
+      if (schedules.isNotEmpty) {
+        final schedData = schedules.map((s) => {
+          ...s,
+          'event_id': eventId,
+        }).toList();
+        await _client.from('event_schedules').insert(schedData);
+      }
+    }
+
+    return Event.fromJson(response);
+  }
+
+  Future<void> deleteEvent(String eventId) async {
+    // Delete dependencies first if RLS/OnDelete Cascade is not set
+    await _client.from('event_categories').delete().eq('event_id', eventId);
+    await _client.from('event_schedules').delete().eq('event_id', eventId);
+    await _client.from('events').delete().eq('id', eventId);
+  }
+
+  Future<List<VenueLocation>> getAllVenues() async {
+    final response = await _client.from('venue_locations').select().order('name');
+    final data = response as List<dynamic>;
+    return data.map((json) => VenueLocation.fromJson(json)).toList();
   }
 }
