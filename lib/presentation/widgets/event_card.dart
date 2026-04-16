@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/event_model.dart';
 import '../screens/event_detail_screen.dart';
-import '../../core/app_theme.dart';
+import '../../core/app_colors.dart';
 
 class EventCard extends StatelessWidget {
   final Event event;
@@ -12,14 +12,50 @@ class EventCard extends StatelessWidget {
     required this.event,
   });
 
+  Color _getCategoryColor(String? categoryId) {
+    if (categoryId == null) return AppColors.categoryDefault;
+    final int hash = categoryId.hashCode;
+    final colors = [
+      AppColors.categoryAnime,
+      AppColors.categoryFood,
+      AppColors.categoryTech,
+      AppColors.categoryArt,
+    ];
+    return colors[hash % colors.length];
+  }
+
   @override
   Widget build(BuildContext context) {
+    Color tagColor;
+    Color tagBgColor;
+    String tagText;
+
+    if (event.requiresTicket) {
+      if (event.startDate.isAfter(DateTime.now().add(const Duration(days: 30)))) {
+        tagColor = const Color(0xFFEF9F27);
+        tagBgColor = const Color(0xFFEF9F27).withOpacity(0.15);
+        tagText = 'Próximamente';
+      } else {
+        tagColor = const Color(0xFFE24B4A);
+        tagBgColor = const Color(0xFFE24B4A).withOpacity(0.15);
+        tagText = 'Requiere boleto';
+      }
+    } else {
+      tagColor = const Color(0xFF1D9E75);
+      tagBgColor = const Color(0xFF1D9E75).withOpacity(0.15);
+      tagText = 'Entrada libre';
+    }
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 32),
-      elevation: 2,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.white.withOpacity(0.06), width: 1),
+      ),
       child: InkWell(
+        borderRadius: BorderRadius.circular(14),
         onTap: () {
           Navigator.push(
             context,
@@ -28,164 +64,114 @@ class EventCard extends StatelessWidget {
             ),
           );
         },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                Image.network(
-                  event.imageUrl,
-                  height: 180,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    height: 150,
-                    color: Colors.grey[800],
-                    child: const Center(child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey)),
-                  ),
+        child: SizedBox(
+          height: 104,
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(14),
+                  bottomLeft: Radius.circular(14),
                 ),
-                if (event.category != null)
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryRed,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        event.category!,
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                child: Stack(
+                  children: [
+                    Image.network(
+                      event.imageUrl,
+                      width: 104,
+                      height: 104,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 104,
+                        height: 104,
+                        color: Colors.grey[800],
+                        child: const Center(
+                          child: Icon(Icons.image_not_supported, size: 30, color: Colors.grey),
+                        ),
                       ),
                     ),
-                  ),
-                if (event.isFree)
-                  Positioned(
-                    bottom: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'GRATIS',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _getCategoryColor(event.categoryId),
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
-                  ),
-                // Indicadores de Estado (Guardado / Ticket)
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Row(
-                    children: [
-                      if (event.isSaved)
-                        Container(
-                          margin: const EdgeInsets.only(right: 4),
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(Icons.favorite, color: AppColors.primaryRed, size: 16),
-                        ),
-                      if (event.isTicket)
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(Icons.confirmation_num, color: Colors.green, size: 16),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today, size: 14, color: AppColors.primaryRed),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatEventDate(event),
-                        style: const TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        event.requiresTicket ? Icons.confirmation_number_outlined : Icons.door_front_door_outlined,
-                        size: 14,
-                        color: event.requiresTicket ? Colors.blueAccent : Colors.green,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        event.requiresTicket ? 'Requiere boleto' : 'Entrada libre',
-                        style: TextStyle(
-                          color: event.requiresTicket ? Colors.blueAccent : Colors.green,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, size: 14, color: AppColors.primaryRed),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          event.location,
-                          style: const TextStyle(color: Colors.white70, fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        event.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "${_formatShortDate(event)} ${event.location.isNotEmpty ? '• ${event.location}' : ''}",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: tagBgColor,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              tagText,
+                              style: TextStyle(
+                                color: tagColor,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  String _formatEventDate(Event event) {
+  String _formatShortDate(Event event) {
     final start = event.startDate;
     final end = event.endDate;
     
-    // Si la fecha de fin es igual a la de inicio (mismo día)
     if (start.year == end.year && start.month == end.month && start.day == end.day) {
-      return DateFormat("d 'de' MMMM", 'es').format(start);
+      return DateFormat("d MMM", 'es').format(start);
     }
     
-    // Si es el mismo mes
-    if (start.year == end.year && start.month == end.month) {
-      final month = DateFormat('MMMM', 'es').format(start);
-      return "${start.day} al ${end.day} de $month";
-    }
-    
-    // Si son meses distintos
-    final monthStart = DateFormat('MMM', 'es').format(start);
-    final monthEnd = DateFormat('MMM', 'es').format(end);
-    return "${start.day} de $monthStart al ${end.day} de $monthEnd";
+    return "${DateFormat("d", 'es').format(start)}-${DateFormat("d MMM", 'es').format(end)}";
   }
 }

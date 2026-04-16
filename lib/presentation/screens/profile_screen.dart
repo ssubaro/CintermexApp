@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/app_theme.dart';
+import '../../core/app_colors.dart';
 import '../../data/models/category_model.dart';
 import '../../data/services/supabase_service.dart';
-import '../widgets/status_dialog.dart';
 import 'edit_profile_screen.dart';
 import 'home_screen.dart';
+import 'my_tickets_screen.dart';
+import 'reset_password_screen.dart'; // Módulo asumiendo que existe o similar
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -21,7 +22,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _profile;
   List<Category> _allCategories = [];
   List<String> _selectedCategoryIds = [];
-  bool _savingInterests = false;
+  bool _notificationsEnabled = true;
+  String _selectedLanguage = 'Español';
 
   @override
   void initState() {
@@ -33,7 +35,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
     try {
       final user = _supabaseService.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
       final results = await Future.wait([
         _supabaseService.getProfile(user.id),
@@ -45,14 +50,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _allCategories = results[1] as List<Category>;
       _selectedCategoryIds = results[2] as List<String>;
 
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _saveInterests() async {
-    setState(() => _savingInterests = true);
     try {
       final user = _supabaseService.currentUser;
       if (user == null) return;
@@ -65,11 +69,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.primaryRed),
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.primary),
         );
       }
-    } finally {
-      if (mounted) setState(() => _savingInterests = false);
     }
   }
 
@@ -77,15 +79,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2C2C2C),
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Cerrar Sesión', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Cerrar Sesión', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
         content: const Text('¿Estás seguro que deseas cerrar tu sesión?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar', style: TextStyle(color: Colors.white))),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryRed),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
             child: const Text('Cerrar Sesión', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -101,245 +103,203 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _confirmDeleteAccount() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2C2C2C),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(children: const [
-          Icon(Icons.warning_amber_rounded, color: Colors.orange),
-          SizedBox(width: 8),
-          Text('Eliminar Cuenta', style: TextStyle(fontWeight: FontWeight.bold)),
-        ]),
-        content: const Text(
-          'Esta acción eliminará tu perfil y no podrás recuperar tu cuenta ni registrarte con el mismo correo. ¿Estás seguro?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red[800]),
-            child: const Text('Sí, Eliminar', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      try {
-        await _supabaseService.deleteAccount();
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
-        );
-      } catch (e) {
-        await StatusDialog.show(
-          context: context,
-          title: 'Error',
-          message: 'No se pudo eliminar la cuenta: $e',
-          icon: Icons.error_outline,
-          iconColor: AppColors.primaryRed,
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Mi Perfil', style: TextStyle(fontWeight: FontWeight.bold))),
+        body: const Center(child: Text("Inicia sesión para ver tu perfil.")),
+      );
+    }
+
     final displayName = _profile?['display_name'] ?? _profile?['full_name'] ?? 'Usuario';
-    final email = user?.email ?? '';
+    final email = user.email ?? '';
     final fullName = _profile?['full_name'] ?? '';
     final phone = _profile?['phone'] ?? '';
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Mi Perfil'),
-        backgroundColor: AppColors.primaryRed,
-        foregroundColor: Colors.white,
+        title: const Text('Mi Perfil', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        centerTitle: true,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryRed))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Avatar + Nombre
-                  Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 56,
-                        backgroundColor: AppColors.primaryRed,
-                        child: Text(
-                          displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
-                          style: const TextStyle(fontSize: 48, color: Colors.white, fontWeight: FontWeight.bold),
+                   // --- Header ---
+                  Center(
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundColor: AppColors.primary,
+                          child: Text(
+                            displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                            style: const TextStyle(fontSize: 40, color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        displayName,
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(email, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                    ],
+                        const SizedBox(height: 16),
+                        Text(displayName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                        const SizedBox(height: 4),
+                        Text(email, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final updated = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EditProfileScreen(
+                                  initialFullName: fullName,
+                                  initialDisplayName: _profile?['display_name'] ?? '',
+                                  initialPhone: phone,
+                                ),
+                              ),
+                            );
+                            if (updated == true) _loadProfileData();
+                          },
+                          icon: const Icon(Icons.edit, size: 16, color: Colors.white),
+                          label: const Text('Editar perfil', style: TextStyle(color: Colors.white)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.white30),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 32),
 
-                  // Tarjeta con datos
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2C2C2C),
-                      borderRadius: BorderRadius.circular(16),
+                  // --- Mis Boletos ---
+                  const Text('MIS BOLETOS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const SizedBox(height: 8),
+                  _buildSectionContainer(
+                    child: ListTile(
+                      leading: const Icon(Icons.qr_code_scanner, color: Colors.white),
+                      title: const Text('Boletos Comprados', style: TextStyle(color: Colors.white)),
+                      trailing: const Icon(Icons.chevron_right, color: Colors.white54),
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const MyTicketsScreen()));
+                      },
                     ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // --- Preferencias ---
+                  const Text('PREFERENCIAS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const SizedBox(height: 8),
+                  _buildSectionContainer(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _profileDataRow(Icons.person, 'Nombre', fullName.isNotEmpty ? fullName : 'No especificado'),
-                        const Divider(color: Colors.white12, height: 24),
-                        _profileDataRow(Icons.email, 'Correo', email),
-                        if (phone.isNotEmpty) ...[
-                          const Divider(color: Colors.white12, height: 24),
-                          _profileDataRow(Icons.phone, 'Teléfono', phone),
-                        ],
+                        SwitchListTile(
+                          title: const Text('Notificaciones Push', style: TextStyle(color: Colors.white)),
+                          activeColor: AppColors.primary,
+                          value: _notificationsEnabled,
+                          onChanged: (val) => setState(() => _notificationsEnabled = val),
+                        ),
+                        const Divider(color: Colors.white12, height: 1),
+                        ListTile(
+                          title: const Text('Idioma', style: TextStyle(color: Colors.white)),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_selectedLanguage, style: const TextStyle(color: Colors.grey)),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.chevron_right, color: Colors.white54),
+                            ],
+                          ),
+                          onTap: () {},
+                        ),
+                        const Divider(color: Colors.white12, height: 1),
+                        ExpansionTile(
+                          title: const Text('Categorías de interés', style: TextStyle(color: Colors.white)),
+                          iconColor: AppColors.primary,
+                          collapsedIconColor: Colors.white54,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: _allCategories.map((category) {
+                                  final isSelected = _selectedCategoryIds.contains(category.id);
+                                  return FilterChip(
+                                    label: Text(category.name),
+                                    selected: isSelected,
+                                    selectedColor: AppColors.primary.withOpacity(0.3),
+                                    checkmarkColor: AppColors.primary,
+                                    backgroundColor: Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      side: BorderSide(color: isSelected ? AppColors.primary : Colors.white30),
+                                    ),
+                                    labelStyle: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.white70,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                    onSelected: (selected) {
+                                      setState(() {
+                                        if (selected) _selectedCategoryIds.add(category.id);
+                                        else _selectedCategoryIds.remove(category.id);
+                                      });
+                                      _saveInterests();
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Botón editar datos
-                  _actionButton(
-                    icon: Icons.edit_outlined,
-                    label: 'Editar mis datos',
-                    onTap: () async {
-                      final updated = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EditProfileScreen(
-                            initialFullName: fullName,
-                            initialDisplayName: _profile?['display_name'] ?? '',
-                            initialPhone: phone,
-                          ),
-                        ),
-                      );
-                      if (updated == true) _loadProfileData();
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Cambiar intereses
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2C2C2C),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(16),
+                  // --- Cuenta ---
+                  const Text('CUENTA', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const SizedBox(height: 8),
+                  _buildSectionContainer(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(children: const [
-                              Icon(Icons.interests_outlined, color: AppColors.primaryRed),
-                              SizedBox(width: 12),
-                              Text('Mis Intereses', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            ]),
-                            TextButton(
-                              onPressed: _savingInterests ? null : _saveInterests,
-                              child: _savingInterests
-                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                  : const Text('Guardar', style: TextStyle(color: AppColors.primaryRed)),
-                            ),
-                          ],
+                        ListTile(
+                          leading: const Icon(Icons.lock_outline, color: Colors.white),
+                          title: const Text('Cambiar Contraseña', style: TextStyle(color: Colors.white)),
+                          trailing: const Icon(Icons.chevron_right, color: Colors.white54),
+                          onTap: () {
+                             // Assuming standard change password flow
+                             Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
+                          },
                         ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _allCategories.map((cat) {
-                            final isSelected = _selectedCategoryIds.contains(cat.id);
-                            return FilterChip(
-                              label: Text(cat.name),
-                              selected: isSelected,
-                              selectedColor: AppColors.primaryRed.withOpacity(0.25),
-                              checkmarkColor: AppColors.primaryRed,
-                              onSelected: (bool selected) {
-                                setState(() {
-                                  if (selected) _selectedCategoryIds.add(cat.id);
-                                  else _selectedCategoryIds.remove(cat.id);
-                                });
-                              },
-                            );
-                          }).toList(),
+                        const Divider(color: Colors.white12, height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.logout, color: AppColors.primary),
+                          title: const Text('Cerrar Sesión', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          onTap: _confirmLogout,
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 32),
-
-                  // Cerrar Sesión
-                  _actionButton(
-                    icon: Icons.logout,
-                    label: 'Cerrar Sesión',
-                    color: Colors.orange,
-                    onTap: _confirmLogout,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Eliminar cuenta
-                  _actionButton(
-                    icon: Icons.delete_forever_outlined,
-                    label: 'Eliminar Cuenta',
-                    color: Colors.red[300]!,
-                    onTap: _confirmDeleteAccount,
-                  ),
                 ],
               ),
             ),
     );
   }
 
-  Widget _profileDataRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.primaryRed, size: 20),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-            Text(value, style: const TextStyle(fontSize: 15)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _actionButton({required IconData icon, required String label, required VoidCallback onTap, Color? color}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2C2C2C),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color ?? Colors.white70),
-            const SizedBox(width: 16),
-            Text(label, style: TextStyle(fontSize: 16, color: color ?? Colors.white70)),
-            const Spacer(),
-            const Icon(Icons.chevron_right, color: Colors.white30),
-          ],
-        ),
+  Widget _buildSectionContainer({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
+      child: child,
     );
   }
 }
