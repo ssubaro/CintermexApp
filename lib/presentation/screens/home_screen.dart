@@ -5,11 +5,14 @@ import '../../core/app_theme.dart';
 import '../../core/constants.dart';
 import '../../data/models/event_model.dart';
 import '../../data/models/category_model.dart';
+import '../../data/models/announcement_model.dart';
 import '../../data/services/supabase_service.dart';
 import '../widgets/custom_drawer.dart';
 import '../widgets/event_card.dart';
 import 'login_screen.dart';
 import 'profile_screen.dart';
+import 'event_detail_screen.dart';
+import '../widgets/estacionamiento_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,13 +25,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final SupabaseService _supabaseService = SupabaseService();
   List<Category> _categories = [];
   List<String> _selectedCategoryIds = [];
+  List<Event> _forYouEvents = [];
+  List<Announcement> _announcements = [];
   bool _isLoading = true;
-
-  final List<String> _bannerImages = [
-    'https://i.ytimg.com/vi/sI6fg4q98Is/maxresdefault.jpg',
-    'https://scontent-qro1-2.xx.fbcdn.net/v/t39.30808-6/629656775_1379915637510040_3990866888935312711_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=13d280&_nc_ohc=ElCD4MPmrq8Q7kNvwGpgZeT&_nc_oc=AdmtevaND2nmp8DJL1-31saz59DXHgTgfuZB1Y8a66KF919VYhOQ8bIt76yYyNsorVA&_nc_zt=23&_nc_ht=scontent-qro1-2.xx&_nc_gid=G_S_Guw6vd1F_qzfI67onw&oh=00_AfuH7yIbysGaLaza3kyfUYh5JbTSDVIFueY_9k-LSooRg&oe=69A570E4',
-    'https://tse4.mm.bing.net/th/id/OIP.brloUje5f0mZIwIzCakuAgHaGW?rs=1&pid=ImgDetMain&o=7&rm=3',
-  ];
+  int _currentSlide = 0;
 
   int? _selectedMonthIndex = DateTime.now().month - 1; // 0-based index
   int _selectedYear = DateTime.now().year;
@@ -57,14 +57,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedYear = now.year;
       final selectedMonth = _selectedMonthIndex! + 1; // 1-based
 
-      // Si el mes seleccionado ya pasó en el año actual, buscamos en el siguiente año
-      if (selectedMonth < now.month) {
-        _selectedYear++;
-      }
-
       start = DateTime(_selectedYear, selectedMonth, 1);
       // El día 0 del mes siguiente es el último día del mes actual
       end = DateTime(_selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+    } else {
+      start = DateTime.now();
+      end = null;
     }
 
     _supabaseService.refreshEvents(
@@ -86,9 +84,13 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final futures = await Future.wait([
         _supabaseService.getCategories(),
+        _supabaseService.getForYouEvents(),
+        _supabaseService.getAnnouncements(),
       ]);
       setState(() {
-        _categories = futures[0];
+        _categories = futures[0] as List<Category>;
+        _forYouEvents = futures[1] as List<Event>;
+        _announcements = futures[2] as List<Announcement>;
         _isLoading = false;
       });
     } catch (e) {
@@ -97,149 +99,198 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _showMultiSelectCategories() {
-    String searchQuery = '';
+  List<Widget> _buildSliderItems() {
+    List<Widget> items = [];
+    
+    for (var event in _forYouEvents) {
+      items.add(_buildEventSlide(event));
+    }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled:
-          true, // Esto es super importante para que el teclado no tape el menú
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            // Filtrar categorias en tiempo real
-            final currentCategories = _categories.where((cat) {
-              return cat.name
-                      .toLowerCase()
-                      .contains(searchQuery.toLowerCase()) ||
-                  cat.slug.toLowerCase().contains(searchQuery.toLowerCase());
-            }).toList();
+    for (var aviso in _announcements) {
+      items.add(_buildAnnouncementSlide(aviso));
+    }
 
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                height: MediaQuery.of(context).size.height * 0.7,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Seleccionar Categorías',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primaryRed),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setModalState(() {
-                              _selectedCategoryIds.clear();
-                              searchQuery = ''; // Limpiar la busqueda
-                            });
-                            setState(() {});
-                            _updateEvents();
-                          },
-                          child: const Text('Limpiar',
-                              style: TextStyle(color: Colors.grey)),
-                        )
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Búsqueda
-                    TextField(
-                      onChanged: (value) {
-                        setModalState(() {
-                          searchQuery = value;
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Buscar categoría...',
-                        prefixIcon: const Icon(Icons.search,
-                            color: AppColors.primaryRed),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.primaryRed),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: currentCategories.isEmpty
-                          ? const Center(
-                              child: Text('No se encontraron categorías',
-                                  style: TextStyle(color: Colors.grey)))
-                          : ListView.builder(
-                              itemCount: currentCategories.length,
-                              itemBuilder: (context, index) {
-                                final cat = currentCategories[index];
-                                final isSelected =
-                                    _selectedCategoryIds.contains(cat.id);
-                                return CheckboxListTile(
-                                  title: Text(cat.slug,
-                                      style: const TextStyle(fontSize: 16)),
-                                  value: isSelected,
-                                  activeColor: AppColors.primaryRed,
-                                  contentPadding: EdgeInsets.zero,
-                                  onChanged: (val) {
-                                    setModalState(() {
-                                      if (val == true) {
-                                        _selectedCategoryIds.add(cat.id);
-                                      } else {
-                                        _selectedCategoryIds.remove(cat.id);
-                                      }
-                                    });
-                                    setState(() {}); // Update main UI
-                                    _updateEvents(); // Fetch new data
-                                  },
-                                );
-                              },
-                            ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryRed,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cerrar',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
+    if (items.isEmpty) {
+      items.add(Container(
+        margin: const EdgeInsets.symmetric(horizontal: 5.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(14.0),
+        ),
+        child: const Center(
+          child: Text("Explora eventos próximos", style: TextStyle(color: Colors.white, fontSize: 16)),
+        ),
+      ));
+    }
+
+    items.add(Builder(
+      builder: (BuildContext context) {
+        // Envolvemos el widget existente en tap o simplemente lo mostramos. Ya tiene botones.
+        return const EstacionamientoWidget();
+      },
+    ));
+
+    return items;
+  }
+
+  Widget _buildEventSlide(Event event) {
+    return Builder(
+      builder: (BuildContext context) {
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => EventDetailScreen(event: event)));
           },
+          child: Container(
+            width: MediaQuery.of(context).size.width,
+            margin: const EdgeInsets.symmetric(horizontal: 5.0),
+            decoration: BoxDecoration(
+              color: Colors.grey,
+              borderRadius: BorderRadius.circular(14.0),
+              image: DecorationImage(
+                image: NetworkImage(event.imageUrl),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14.0),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, const Color(0xFF0F0F0F).withOpacity(0.95)],
+                        stops: const [0.4, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      event.category?.toUpperCase() ?? "DESTACADO",
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  right: 16,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(event.title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Text("${event.startDate.day}/${event.startDate.month}/${event.startDate.year} • ${event.location}", style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
   }
+
+  Widget _buildAnnouncementSlide(Announcement aviso) {
+    return Builder(
+      builder: (BuildContext context) {
+        return Container(
+          width: MediaQuery.of(context).size.width,
+          margin: const EdgeInsets.symmetric(horizontal: 5.0),
+          decoration: BoxDecoration(
+            color: Colors.grey,
+            borderRadius: BorderRadius.circular(14.0),
+            image: DecorationImage(
+              image: NetworkImage(aviso.imageUrl),
+              fit: BoxFit.cover,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14.0),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, const Color(0xFF0F0F0F).withOpacity(0.95)],
+                      stops: const [0.4, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.announcement,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    "AVISO",
+                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 16,
+                left: 16,
+                right: 16,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(aviso.title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDotsIndicator() {
+    int totalItems = _forYouEvents.length + _announcements.length + 1;
+    if (totalItems <= 1) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(totalItems, (index) {
+        bool isParking = index == totalItems - 1;
+        bool isAnnouncement = !isParking && index >= _forYouEvents.length;
+        Color activeColor = AppColors.primary;
+        if (isParking) activeColor = Colors.grey;
+        else if (isAnnouncement) activeColor = AppColors.announcement;
+
+        return Container(
+          width: 8.0,
+          height: 8.0,
+          margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 4.0),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _currentSlide == index ? activeColor : Colors.grey.withOpacity(0.3),
+          ),
+        );
+      }),
+    );
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -287,193 +338,148 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Banner Section
-            CarouselSlider(
-              options: CarouselOptions(
-                height: 200.0,
-                autoPlay: true,
-                autoPlayInterval: const Duration(seconds: 3),
-                enlargeCenterPage: true,
-                viewportFraction: 0.9,
-                aspectRatio: 2.0,
-              ),
-              items: _bannerImages.map((i) {
-                return Builder(
-                  builder: (BuildContext context) {
-                    return Container(
-                      width: MediaQuery.of(context).size.width,
-                      margin: const EdgeInsets.symmetric(horizontal: 5.0),
-                      decoration: BoxDecoration(
-                        color: Colors.grey,
-                        borderRadius: BorderRadius.circular(8.0),
-                        image: DecorationImage(
-                          image: NetworkImage(i),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    );
-                  },
-                );
-              }).toList(),
+            Column(
+              children: [
+                CarouselSlider(
+                  options: CarouselOptions(
+                    height: 200.0,
+                    autoPlay: true,
+                    autoPlayInterval: const Duration(seconds: 4),
+                    enlargeCenterPage: true,
+                    viewportFraction: 0.9,
+                    aspectRatio: 2.0,
+                    onPageChanged: (index, reason) {
+                      setState(() => _currentSlide = index);
+                    },
+                  ),
+                  items: _buildSliderItems(),
+                ),
+                _buildDotsIndicator(),
+              ],
             ),
 
             // Month Filter Section
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      color: (_selectedMonthIndex == null)
-                          ? AppColors.primaryRed
-                          : Colors.grey.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.filter_alt_off,
-                        color: (_selectedMonthIndex == null)
-                            ? Colors.white
-                            : Colors.white70,
-                      ),
-                      tooltip: 'Todos los meses',
-                      onPressed: () {
+              padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+              child: SizedBox(
+                height: 42,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _months.length + 1, // +1 for "Todos"
+                  separatorBuilder: (context, index) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final isAll = index == 0;
+                    final isSelected = isAll ? _selectedMonthIndex == null : (index - 1) == _selectedMonthIndex;
+
+                    return GestureDetector(
+                      onTap: () {
                         setState(() {
-                          _selectedMonthIndex = null;
+                          _selectedMonthIndex = isAll ? null : (index - 1);
                         });
                         _updateEvents();
                       },
-                    ),
-                  ),
-                  Expanded(
-                    child: SizedBox(
-                      height: 56,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _months.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(width: 10),
-                        itemBuilder: (context, index) {
-                          final isSelected = index == _selectedMonthIndex;
-                          return ChoiceChip(
-                            label: Text(_months[index]),
-                            selected: isSelected,
-                            selectedColor: AppColors.primaryRed,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            labelStyle: TextStyle(
-                              fontSize: 16,
-                              color: isSelected ? Colors.white : Colors.grey,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                      child: Container(
+                        width: 42,
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.12),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (isAll)
+                              Icon(
+                                Icons.calendar_today,
+                                size: 14,
+                                color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+                              )
+                            else
+                              Text(
+                                '${index}', // Basic 1-12 mapping for month numbers
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+                                ),
+                              ),
+                            Text(
+                              isAll ? 'All' : _months[index - 1],
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+                              ),
                             ),
-                            onSelected: (bool selected) {
-                              if (selected) {
-                                setState(() {
-                                  _selectedMonthIndex = index;
-                                });
-                                _updateEvents();
-                              }
-                            },
-                          );
-                        },
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    );
+                  },
+                ),
               ),
             ),
 
             // Category Filter Section
             if (_isLoading)
-              const Center(
-                  child: CircularProgressIndicator(color: AppColors.primaryRed))
+               const Center(child: Padding(
+                 padding: EdgeInsets.all(8.0),
+                 child: CircularProgressIndicator(color: AppColors.primaryRed),
+               ))
             else
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Row(
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.only(right: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.checklist, color: Colors.white),
-                        tooltip: 'Filtro avanzado',
-                        onPressed: _showMultiSelectCategories,
-                      ),
-                    ),
-                    Expanded(
-                      child: SizedBox(
-                        height: 48,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _categories.length + 1,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(width: 10),
-                          itemBuilder: (context, index) {
-                            if (index == 0) {
-                              final isSelected = _selectedCategoryIds.isEmpty;
-                              return ChoiceChip(
-                                label: const Text('Todos'),
-                                selected: isSelected,
-                                selectedColor: AppColors.primaryRed,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                                labelStyle: TextStyle(
-                                  fontSize: 14,
-                                  color:
-                                      isSelected ? Colors.white : Colors.grey,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                                onSelected: (bool selected) {
-                                  if (selected) {
-                                    setState(() {
-                                      _selectedCategoryIds.clear();
-                                    });
-                                    _updateEvents();
-                                  }
-                                },
-                              );
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: SizedBox(
+                  height: 30, // Fit the new categories styling
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _categories.length + 1,
+                    separatorBuilder: (context, index) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final isAll = index == 0;
+                      final isSelected = isAll ? _selectedCategoryIds.isEmpty : _selectedCategoryIds.contains(_categories[index - 1].id);
+                      final label = isAll ? 'Todos' : _categories[index - 1].slug;
+
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (isAll) {
+                              _selectedCategoryIds.clear();
+                            } else {
+                              final catId = _categories[index - 1].id;
+                              if (_selectedCategoryIds.contains(catId)) {
+                                _selectedCategoryIds.remove(catId);
+                              } else {
+                                _selectedCategoryIds.add(catId);
+                              }
                             }
-                            final category = _categories[index - 1];
-                            final isSelected =
-                                _selectedCategoryIds.contains(category.id);
-                            return ChoiceChip(
-                              label: Text(category.slug),
-                              selected: isSelected,
-                              selectedColor: AppColors.primaryRed,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              labelStyle: TextStyle(
-                                fontSize: 14,
-                                color: isSelected ? Colors.white : Colors.grey,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                              onSelected: (bool selected) {
-                                setState(() {
-                                  if (selected) {
-                                    _selectedCategoryIds.add(category.id);
-                                  } else {
-                                    _selectedCategoryIds.remove(category.id);
-                                  }
-                                });
-                                _updateEvents();
-                              },
-                            );
-                          },
+                          });
+                          _updateEvents();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.15),
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isSelected ? Colors.white : Colors.white.withOpacity(0.55),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
               ),
 
@@ -538,55 +544,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   itemCount: events.length,
                   itemBuilder: (context, index) {
                     final event = events[index];
-                    return EventCard(event: event);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: EventCard(event: event),
+                    );
                   },
                 );
               },
             ),
-
-            // Footer Section
-            Container(
-              color: AppColors.darkGrey,
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                          icon: const Icon(Icons.facebook, color: Colors.white),
-                          onPressed: () {}),
-                      IconButton(
-                          icon: const Icon(Icons.add_ic_call_sharp,
-                              color: Colors.white),
-                          onPressed: () {}),
-                      IconButton(
-                          icon: const Icon(Icons.web, color: Colors.white),
-                          onPressed: () {}),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextButton(
-                      onPressed: () {},
-                      child: const Text("Términos y Condiciones",
-                          style: TextStyle(color: Colors.white70))),
-                  TextButton(
-                      onPressed: () {},
-                      child: const Text("Aviso de Privacidad",
-                          style: TextStyle(color: Colors.white70))),
-                  TextButton(
-                      onPressed: () {},
-                      child: const Text("Acerca de Nosotros",
-                          style: TextStyle(color: Colors.white70))),
-                  const SizedBox(height: 10),
-                  const Text("© 2026 Cintermex. Todos los derechos reservados.",
-                      style: TextStyle(color: Colors.white54, fontSize: 12)),
-                ],
-              ),
-            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
     );
+
   }
 }

@@ -107,21 +107,6 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
       final user = _supabaseService.currentUser;
       if (user == null) throw Exception('Usuario no autenticado');
 
-      // 1. Crear la Orden en estado 'pending'
-      final order = await _supabaseService.createOrder(
-        eventId: widget.event.id,
-        ticketTypeId: _selectedTicketType?.id,
-        quantity: _quantity,
-        unitPrice: _unitPrice,
-      );
-
-      // 2. Crear el Ticket asociado a la Orden
-      await _supabaseService.purchaseTicket(
-        eventId: widget.event.id,
-        quantity: _quantity,
-        pricePaid: _totalPrice,
-        orderId: order.id,
-      );
 
       // Obtener el nombre real del usuario del perfil
       final profile = await _supabaseService.getProfile(user.id);
@@ -188,10 +173,25 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryRed,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('IR A MIS BOLETOS', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text('VER MIS BOLETOS', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.white38),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('REGRESAR A LA COMPRA', 
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
