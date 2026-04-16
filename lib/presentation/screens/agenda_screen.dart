@@ -192,7 +192,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ...monthEvents.map((e) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: EventCard(event: e),
-            )).toList(),
+            )),
           ],
         );
       },

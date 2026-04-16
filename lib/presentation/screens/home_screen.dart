@@ -24,7 +24,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final SupabaseService _supabaseService = SupabaseService();
   List<Category> _categories = [];
-  List<String> _selectedCategoryIds = [];
+  final List<String> _selectedCategoryIds = [];
   List<Event> _forYouEvents = [];
   List<Announcement> _announcements = [];
   bool _isLoading = true;
@@ -274,8 +274,9 @@ class _HomeScreenState extends State<HomeScreen> {
         bool isParking = index == totalItems - 1;
         bool isAnnouncement = !isParking && index >= _forYouEvents.length;
         Color activeColor = AppColors.primary;
-        if (isParking) activeColor = Colors.grey;
-        else if (isAnnouncement) activeColor = AppColors.announcement;
+        if (isParking) {
+          activeColor = Colors.grey;
+        } else if (isAnnouncement) activeColor = AppColors.announcement;
 
         return Container(
           width: 8.0,
@@ -399,7 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               )
                             else
                               Text(
-                                '${index}', // Basic 1-12 mapping for month numbers
+                                '$index', // Basic 1-12 mapping for month numbers
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,

@@ -30,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isRoleSelected = false; // State to toggle pages
 
   List<Category> _categories = [];
-  List<String> _selectedCategoryIds = [];
+  final List<String> _selectedCategoryIds = [];
 
   // Validation states
   bool _isEmailValid = false;

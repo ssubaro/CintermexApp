@@ -23,7 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Category> _allCategories = [];
   List<String> _selectedCategoryIds = [];
   bool _notificationsEnabled = true;
-  String _selectedLanguage = 'Español';
+  final String _selectedLanguage = 'Español';
 
   @override
   void initState() {
@@ -199,7 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         SwitchListTile(
                           title: const Text('Notificaciones Push', style: TextStyle(color: Colors.white)),
-                          activeColor: AppColors.primary,
+                          activeThumbColor: AppColors.primary,
                           value: _notificationsEnabled,
                           onChanged: (val) => setState(() => _notificationsEnabled = val),
                         ),
@@ -245,8 +245,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                     onSelected: (selected) {
                                       setState(() {
-                                        if (selected) _selectedCategoryIds.add(category.id);
-                                        else _selectedCategoryIds.remove(category.id);
+                                        if (selected) {
+                                          _selectedCategoryIds.add(category.id);
+                                        } else {
+                                          _selectedCategoryIds.remove(category.id);
+                                        }
                                       });
                                       _saveInterests();
                                     },

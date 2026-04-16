@@ -59,7 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: context.watch<ThemeProvider>().isDarkMode ? 'Modo Oscuro' : 'Modo Claro',
             trailing: Switch(
               value: context.watch<ThemeProvider>().isDarkMode,
-              activeColor: AppColors.primaryRed,
+              activeThumbColor: AppColors.primaryRed,
               onChanged: (_) => context.read<ThemeProvider>().toggleTheme(),
             ),
           ),

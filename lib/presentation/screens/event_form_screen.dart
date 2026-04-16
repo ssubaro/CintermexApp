@@ -169,7 +169,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedVenueId,
+              initialValue: _selectedVenueId,
               decoration: const InputDecoration(labelText: 'Lugar (Sala/Área)', prefixIcon: Icon(Icons.location_on)),
               items: _allVenues.map((v) => DropdownMenuItem(value: v.id, child: Text(v.name))).toList(),
               onChanged: (val) => setState(() => _selectedVenueId = val),
@@ -212,8 +212,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
                   selected: isSelected,
                   onSelected: (selected) {
                     setState(() {
-                      if (selected) _selectedCategoryIds.add(cat.id);
-                      else _selectedCategoryIds.remove(cat.id);
+                      if (selected) {
+                        _selectedCategoryIds.add(cat.id);
+                      } else {
+                        _selectedCategoryIds.remove(cat.id);
+                      }
                     });
                   },
                 );
@@ -278,7 +281,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: _isSaving ? null : _save,
