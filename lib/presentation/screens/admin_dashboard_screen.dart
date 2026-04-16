@@ -277,7 +277,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const Text('Asignar Rol:', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: selectedRole,
+                  initialValue: selectedRole,
                   decoration: const InputDecoration(border: OutlineInputBorder()),
                   items: const [
                     DropdownMenuItem(value: 'organizador', child: Text('Organizador')),

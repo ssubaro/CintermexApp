@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/services/supabase_service.dart';
-import '../screens/home_screen.dart';
+import '../screens/main_screen.dart';
 import '../screens/admin_dashboard_screen.dart';
-
 
 class RootWrapper extends StatefulWidget {
   const RootWrapper({super.key});
@@ -27,7 +26,7 @@ class _RootWrapperState extends State<RootWrapper> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       setState(() {
-        _homeScreen = const HomeScreen();
+        _homeScreen = const MainScreen();
         _isLoading = false;
       });
       return;
@@ -39,13 +38,13 @@ class _RootWrapperState extends State<RootWrapper> {
         if (role == 'admin') {
           _homeScreen = const AdminDashboardScreen();
         } else {
-          _homeScreen = const HomeScreen();
+          _homeScreen = const MainScreen();
         }
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _homeScreen = const HomeScreen();
+        _homeScreen = const MainScreen();
         _isLoading = false;
       });
     }
@@ -60,6 +59,6 @@ class _RootWrapperState extends State<RootWrapper> {
         ),
       );
     }
-    return _homeScreen ?? const HomeScreen();
+    return _homeScreen ?? const MainScreen();
   }
 }
