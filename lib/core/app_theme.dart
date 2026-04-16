@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-class AppColors {
-  static const Color primaryRed = Color(0xFFEC2227);
-  static const Color darkGrey = Color(0xFF212529);
-  static const Color lightBackground = Color(0xFFF5F5F5);
-  static const Color lightSurface = Color(0xFFFFFFFF);
-}
+import 'app_colors.dart';
+export 'app_colors.dart';
 
 class AppTheme {
   static ThemeData get darkTheme {

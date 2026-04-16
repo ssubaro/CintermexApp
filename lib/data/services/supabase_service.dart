@@ -6,8 +6,7 @@ import '../models/category_model.dart';
 import '../models/ticket_type_model.dart';
 import '../models/order_model.dart';
 import '../models/venue_model.dart';
-
-
+import '../models/announcement_model.dart';
 
 class SupabaseService {
   final SupabaseClient _client = Supabase.instance.client;
@@ -85,7 +84,8 @@ class SupabaseService {
     );
 
     if (response.status != 200) {
-      throw Exception('Error al crear usuario: ${response.data['error'] ?? 'Desconocido'}');
+      throw Exception(
+          'Error al crear usuario: ${response.data['error'] ?? 'Desconocido'}');
     }
   }
 
@@ -106,7 +106,8 @@ class SupabaseService {
       data: {
         'role': role,
         if (fullName != null && fullName.isNotEmpty) 'full_name': fullName,
-        if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        if (displayName != null && displayName.isNotEmpty)
+          'display_name': displayName,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
       },
     );
@@ -121,22 +122,26 @@ class SupabaseService {
           'email': email,
           'role': role,
           if (fullName != null && fullName.isNotEmpty) 'full_name': fullName,
-          if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+          if (displayName != null && displayName.isNotEmpty)
+            'display_name': displayName,
           if (phone != null && phone.isNotEmpty) 'phone': phone,
         });
 
         // Insertar intereses si hay
         if (selectedCategoryIds != null && selectedCategoryIds.isNotEmpty) {
-          final interestsData = selectedCategoryIds.map((categoryId) => {
-            'user_id': user.id,
-            'category_id': categoryId,
-          }).toList();
+          final interestsData = selectedCategoryIds
+              .map((categoryId) => {
+                    'user_id': user.id,
+                    'category_id': categoryId,
+                  })
+              .toList();
           await _client.from('user_interests').insert(interestsData);
         }
       } catch (e) {
         // El insert puede fallar si RLS bloquea la escritura antes de confirmación.
         // El trigger de Supabase lo compensará al confirmar el correo.
-        print('Note: Direct profile insert failed (expected if email confirm pending): $e');
+        print(
+            'Note: Direct profile insert failed (expected if email confirm pending): $e');
       }
     }
 
@@ -162,7 +167,8 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getAllProfiles() async {
-    final response = await _client.from('profiles').select().order('created_at');
+    final response =
+        await _client.from('profiles').select().order('created_at');
     return List<Map<String, dynamic>>.from(response);
   }
 
@@ -189,9 +195,10 @@ class SupabaseService {
   }) async {
     final email = _client.auth.currentUser?.email;
     if (email == null) throw Exception('No hay sesión activa');
-    
+
     // Re-autenticar para verificar contraseña actual
-    await _client.auth.signInWithPassword(email: email, password: currentPassword);
+    await _client.auth
+        .signInWithPassword(email: email, password: currentPassword);
     // Cambiar contraseña
     await _client.auth.updateUser(UserAttributes(password: newPassword));
   }
@@ -199,7 +206,7 @@ class SupabaseService {
   Future<void> deleteAccount() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('No hay sesión activa');
-    
+
     // Borrar intereses
     await _client.from('user_interests').delete().eq('user_id', userId);
     // Borrar perfil (el usuario queda sin acceso)
@@ -217,27 +224,27 @@ class SupabaseService {
     return data.map((item) => item['category_id'] as String).toList();
   }
 
-  Future<void> updateUserInterests(String userId, List<String> categoryIds) async {
+  Future<void> updateUserInterests(
+      String userId, List<String> categoryIds) async {
     // 1. Eliminar intereses actuales
     await _client.from('user_interests').delete().eq('user_id', userId);
 
     // 2. Insertar nuevos intereses
     if (categoryIds.isNotEmpty) {
-      final interestsData = categoryIds.map((categoryId) => {
-        'user_id': userId,
-        'category_id': categoryId,
-      }).toList();
-      
+      final interestsData = categoryIds
+          .map((categoryId) => {
+                'user_id': userId,
+                'category_id': categoryId,
+              })
+          .toList();
+
       await _client.from('user_interests').insert(interestsData);
     }
   }
 
   Future<Map<String, dynamic>?> getProfile(String userId) async {
-    final response = await _client
-        .from('profiles')
-        .select()
-        .eq('id', userId)
-        .maybeSingle();
+    final response =
+        await _client.from('profiles').select().eq('id', userId).maybeSingle();
     return response;
   }
 
@@ -248,9 +255,10 @@ class SupabaseService {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
-    String eventCategoriesSelect = (categoryIds != null && categoryIds.isNotEmpty)
-        ? 'event_categories!inner(category_id, categories(*))'
-        : 'event_categories(categories(*))';
+    String eventCategoriesSelect =
+        (categoryIds != null && categoryIds.isNotEmpty)
+            ? 'event_categories!inner(category_id, categories(*))'
+            : 'event_categories(categories(*))';
 
     var query = _client.from('events').select('''
           *,
@@ -278,9 +286,63 @@ class SupabaseService {
   }
 
   Future<List<Category>> getCategories() async {
-    final response = await _client.from('categories').select().order('name');
+    // !inner filters the query results to only parent records that have a match in the related table
+    final response = await _client
+        .from('categories')
+        .select('*, event_categories!inner(event_id)')
+        .order('name');
     final data = response as List<dynamic>;
-    return data.map((json) => Category.fromJson(json)).toList();
+
+    // We unique them in Dart to be safe, as results for many-to-many
+    // through junction tables can sometimes return duplicates if not handled.
+    final categories = data.map((json) => Category.fromJson(json)).toList();
+    final seen = <String>{};
+    return categories.where((c) => seen.add(c.id)).toList();
+  }
+
+  Future<List<Announcement>> getAnnouncements() async {
+    try {
+      final response = await _client
+          .from('announcements')
+          .select()
+          .eq('active', true)
+          .order('created_at', ascending: false);
+      final data = response as List<dynamic>;
+      return data.map((json) => Announcement.fromJson(json)).toList();
+    } catch (e) {
+      print('Avisos no encontrados o tabla inexistente: $e');
+      return []; // Return empty list gracefully
+    }
+  }
+
+  Future<List<Event>> getForYouEvents() async {
+    final userId = _client.auth.currentUser?.id;
+    List<String> userCategories = [];
+
+    if (userId != null) {
+      userCategories = await getUserInterests(userId);
+    }
+
+    var query = _client.from('events').select('''
+          *,
+          venue_locations(*),
+          event_schedules(*),
+          event_categories!inner(category_id, categories(*))
+        ''').gte('start_date', DateTime.now().toIso8601String());
+
+    if (userCategories.isNotEmpty) {
+      query = query.inFilter('event_categories.category_id', userCategories);
+      final response =
+          await query.order('start_date', ascending: true).limit(5);
+      final data = response as List<dynamic>;
+      return data.map((json) => Event.fromJson(json)).toList();
+    } else {
+      final response = await query.limit(20);
+      final data = response as List<dynamic>;
+      final events = data.map((json) => Event.fromJson(json)).toList();
+      events.shuffle(); // Shuffle in dart for pseudo-random
+      return events.take(5).toList();
+    }
   }
 
   Future<List<TicketType>> getTicketTypes(String eventId) async {
@@ -319,6 +381,7 @@ class SupabaseService {
         .from('tickets')
         .select('*, events(*)')
         .eq('user_id', userId)
+        .eq('payment_status', 'completed')
         .order('created_at', ascending: false);
 
     final data = response as List<dynamic>;
@@ -333,8 +396,9 @@ class SupabaseService {
         .from('tickets')
         .select('quantity')
         .eq('user_id', userId)
-        .eq('event_id', eventId);
-    
+        .eq('event_id', eventId)
+        .eq('payment_status', 'completed');
+
     final data = response as List<dynamic>;
     int count = 0;
     for (var item in data) {
@@ -348,13 +412,18 @@ class SupabaseService {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return [];
 
-    // 1. Obtener eventos con tickets
-    final ticketResponse =
-        await _client.from('tickets').select('events(*)').eq('user_id', userId);
-    
+    // 1. Obtener eventos con tickets completados
+    final ticketResponse = await _client
+        .from('tickets')
+        .select('events(*)')
+        .eq('user_id', userId)
+        .eq('payment_status', 'completed');
+
     // 2. Obtener eventos guardados
-    final savedResponse = 
-        await _client.from('saved_events').select('events(*)').eq('user_id', userId);
+    final savedResponse = await _client
+        .from('saved_events')
+        .select('events(*)')
+        .eq('user_id', userId);
 
     final List<dynamic> ticketData = ticketResponse as List<dynamic>;
     final List<dynamic> savedData = savedResponse as List<dynamic>;
@@ -397,7 +466,7 @@ class SupabaseService {
         .eq('user_id', userId)
         .eq('event_id', eventId)
         .maybeSingle();
-    
+
     return response != null;
   }
 
@@ -453,36 +522,6 @@ class SupabaseService {
     return Order.fromJson(response);
   }
 
-  Future<Ticket> purchaseTicket({
-    required String eventId,
-    required int quantity,
-    required double pricePaid,
-    String? orderId,
-    String? scheduleId,
-  }) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null)
-      throw Exception('User must be logged in to purchase tickets');
-
-    final response = await _client
-        .from('tickets')
-        .insert({
-          'user_id': userId,
-          'event_id': eventId,
-          'quantity': quantity,
-          'price_paid': pricePaid,
-          'status': 'active',
-          'payment_status': 'completed',
-          'order_id': orderId,
-          'schedule_id': scheduleId,
-          'ticket_number': 'TICK-${DateTime.now().millisecondsSinceEpoch}',
-        })
-        .select('*, events(*)')
-        .single();
-
-    return Ticket.fromJson(response);
-  }
-
   Future<String> createConektaCheckout({
     required String eventId,
     required String eventTitle,
@@ -530,7 +569,8 @@ class SupabaseService {
   Future<List<Event>> getOrganizerEvents(String organizerId) async {
     final response = await _client
         .from('events')
-        .select('*, venue_locations(*), event_schedules(*), event_categories(categories(*))')
+        .select(
+            '*, venue_locations(*), event_schedules(*), event_categories(categories(*))')
         .eq('organizer_id', organizerId)
         .order('start_date', ascending: true);
 
@@ -541,7 +581,8 @@ class SupabaseService {
   Future<List<Event>> getPendingEvents() async {
     final response = await _client
         .from('events')
-        .select('*, venue_locations(*), event_schedules(*), event_categories(categories(*))')
+        .select(
+            '*, venue_locations(*), event_schedules(*), event_categories(categories(*))')
         .eq('status', 'pending')
         .order('start_date', ascending: true);
 
@@ -559,10 +600,11 @@ class SupabaseService {
     List<Map<String, dynamic>>? schedules,
   }) async {
     final isNew = eventData['id'] == null;
-    
+
     dynamic response;
     if (isNew) {
-      response = await _client.from('events').insert(eventData).select().single();
+      response =
+          await _client.from('events').insert(eventData).select().single();
     } else {
       response = await _client
           .from('events')
@@ -580,12 +622,14 @@ class SupabaseService {
       if (!isNew) {
         await _client.from('event_categories').delete().eq('event_id', eventId);
       }
-      
+
       if (categoryIds.isNotEmpty) {
-        final catData = categoryIds.map((catId) => {
-          'event_id': eventId,
-          'category_id': catId,
-        }).toList();
+        final catData = categoryIds
+            .map((catId) => {
+                  'event_id': eventId,
+                  'category_id': catId,
+                })
+            .toList();
         await _client.from('event_categories').insert(catData);
       }
     }
@@ -598,10 +642,12 @@ class SupabaseService {
       }
 
       if (schedules.isNotEmpty) {
-        final schedData = schedules.map((s) => {
-          ...s,
-          'event_id': eventId,
-        }).toList();
+        final schedData = schedules
+            .map((s) => {
+                  ...s,
+                  'event_id': eventId,
+                })
+            .toList();
         await _client.from('event_schedules').insert(schedData);
       }
     }
@@ -617,7 +663,8 @@ class SupabaseService {
   }
 
   Future<List<VenueLocation>> getAllVenues() async {
-    final response = await _client.from('venue_locations').select().order('name');
+    final response =
+        await _client.from('venue_locations').select().order('name');
     final data = response as List<dynamic>;
     return data.map((json) => VenueLocation.fromJson(json)).toList();
   }

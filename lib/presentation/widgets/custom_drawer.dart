@@ -1,135 +1,237 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/app_theme.dart';
-import '../../data/services/supabase_service.dart';
-import '../screens/my_events_screen.dart';
-import '../screens/my_tickets_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/app_colors.dart';
 import '../screens/login_screen.dart';
-import '../screens/settings_screen.dart';
-import '../screens/organizer_dashboard_screen.dart';
-import '../screens/admin_dashboard_screen.dart';
-
+import '../screens/saved_screen.dart';
+import '../screens/my_tickets_screen.dart';
+import '../widgets/estacionamiento_widget.dart';
 
 class CustomDrawer extends StatelessWidget {
   const CustomDrawer({super.key});
 
-  void _requireAuth(BuildContext context, Widget protectedScreen) {
-    final user = Supabase.instance.client.auth.currentUser;
-    Navigator.pop(context); // Cerrar drawer
-    if (user == null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => protectedScreen),
-      );
+  Future<void> _launchMaps() async {
+    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=25.6782303,-100.2879791');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
 
-  Future<String?> _getUserRole() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return null;
-    return await SupabaseService().getUserRole(user.id);
+  Future<void> _launchEmail() async {
+    final url = Uri.parse('mailto:soporte@cintermex.com?subject=Soporte%20CintermexGO');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
-    final email = user?.email ?? "Inicia sesión para ver tus eventos";
-    final supabaseService = SupabaseService();
+    final hasSession = user != null;
 
     return Drawer(
-      child: FutureBuilder<String?>(
-        future: _getUserRole(),
-        builder: (context, snapshot) {
-          final role = snapshot.data;
+      backgroundColor: const Color(0xFF161616),
+      width: MediaQuery.of(context).size.width * 0.8,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // --- HEADER ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text("C", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (hasSession) ...[
+                          Text(user.email?.split('@').first ?? 'Usuario', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text(user.email ?? '', style: const TextStyle(color: Colors.white54, fontSize: 12), overflow: TextOverflow.ellipsis),
+                        ] else ...[
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                            },
+                            child: const Text('Iniciar sesión', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          ),
+                        ]
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const Divider(color: Colors.white12, height: 1),
 
-          return ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              UserAccountsDrawerHeader(
-                decoration: const BoxDecoration(color: AppColors.primaryRed),
-                accountName: Text(user != null ? (role?.toUpperCase() ?? "Usuario") : "Invitado"),
-                accountEmail: Text(email),
-                currentAccountPicture: const CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: Icon(Icons.person, size: 40, color: AppColors.primaryRed),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.event_available),
-                title: const Text('Mis Eventos'),
-                onTap: () => _requireAuth(context, const MyEventsScreen()),
-              ),
-              ListTile(
-                leading: const Icon(Icons.confirmation_number),
-                title: const Text('Mis Boletos'),
-                onTap: () => _requireAuth(context, const MyTicketsScreen()),
-              ),
-              
-              if (role == 'organizador') ...[
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.dashboard_customize, color: AppColors.primaryRed),
-                  title: const Text('Gestionar Eventos', style: TextStyle(fontWeight: FontWeight.bold)),
-                  onTap: () => _requireAuth(context, const OrganizerDashboardScreen()),
-                ),
-              ],
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  // --- MI CUENTA ---
+                  if (hasSession) ...[
+                    _buildSectionTitle('MI CUENTA'),
+                    _buildDrawerItem(
+                      icon: Icons.confirmation_number_outlined,
+                      title: 'Mis boletos',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const MyTicketsScreen()));
+                      },
+                    ),
+                    _buildDrawerItem(
+                      icon: Icons.history,
+                      title: 'Historial de eventos',
+                      onTap: () {
+                        Navigator.pop(context);
+                        // Using DefaultTabController's index trick or just go to SavedScreen.
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedScreen()));
+                      },
+                    ),
+                    const Divider(color: Colors.white12, height: 24),
+                  ],
 
-              if (role == 'admin') ...[
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.admin_panel_settings, color: Colors.blue),
-                  title: const Text('Panel de Administrador', style: TextStyle(fontWeight: FontWeight.bold)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
-                  },
-                ),
-              ],
+                  // --- VENUE ---
+                  _buildSectionTitle('VENUE'),
+                  _buildDrawerItem(
+                    icon: Icons.map_outlined,
+                    title: 'Mapa de Cintermex',
+                    onTap: () {
+                       // Placeholder map screen
+                       Navigator.pop(context);
+                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mapa en desarrollo')));
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.directions_outlined,
+                    title: 'Cómo llegar',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _launchMaps();
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.local_parking_outlined,
+                    title: 'Estacionamiento',
+                    onTap: () {
+                       Navigator.pop(context);
+                       EstacionamientoWidget.launchParco(context);
+                    },
+                  ),
+                  const Divider(color: Colors.white12, height: 24),
 
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.settings),
-                title: const Text('Configuración'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                },
+                  // --- SOPORTE ---
+                  _buildSectionTitle('SOPORTE'),
+                  _buildDrawerItem(
+                    icon: Icons.help_outline,
+                    title: 'Preguntas Frecuentes',
+                    onTap: () {
+                       Navigator.pop(context);
+                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('FAQs próximamente')));
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.bug_report_outlined,
+                    title: 'Reportar problema',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _launchEmail();
+                    },
+                  ),
+                  const Divider(color: Colors.white12, height: 24),
+
+                  // --- APP ---
+                  _buildSectionTitle('APP'),
+                  _buildDrawerItem(
+                    icon: Icons.info_outline,
+                    title: 'Acerca de Cintermex',
+                    onTap: () {
+                       Navigator.pop(context);
+                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Versión 1.0.0')));
+                    },
+                  ),
+                  
+                  if (hasSession) ...[
+                    _buildDrawerItem(
+                      icon: Icons.logout,
+                      title: 'Cerrar sesión',
+                      color: const Color(0xFFE24B4A),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        _confirmLogout(context);
+                      },
+                    ),
+                  ]
+                ],
               ),
-              if (user != null)
-                ListTile(
-                  leading: const Icon(Icons.exit_to_app, color: Colors.redAccent),
-                  title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.redAccent)),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await supabaseService.signOut();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Sesión cerrada')),
-                      );
-                    }
-                  },
-                )
-              else
-                ListTile(
-                  leading: const Icon(Icons.login),
-                  title: const Text('Iniciar Sesión'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                    );
-                  },
-                ),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('Cerrar sesión', style: TextStyle(color: Colors.white)),
+        content: const Text('¿Seguro que deseas salir?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await Supabase.instance.client.auth.signOut();
+            }, 
+            child: const Text('Salir', style: TextStyle(color: Color(0xFFE24B4A))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white54,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color color = Colors.white,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: color, size: 22),
+      title: Text(title, style: TextStyle(color: color, fontSize: 14)),
+      minLeadingWidth: 24,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      onTap: onTap,
     );
   }
 }
