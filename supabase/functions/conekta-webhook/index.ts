@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
                         event_id: metadata.event_id,
                         quantity: parseInt(metadata.quantity) || 1,
                         selected_date: metadata.selected_date,
+                        ticket_type_id: metadata.ticket_type_id,
                         price_paid: order.amount / 100, // Conekta cents to MXN
                         status: 'valid',
                         payment_status: 'completed',

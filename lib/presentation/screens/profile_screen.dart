@@ -6,7 +6,9 @@ import '../../data/services/supabase_service.dart';
 import 'edit_profile_screen.dart';
 import 'home_screen.dart';
 import 'my_tickets_screen.dart';
-import 'reset_password_screen.dart'; // Módulo asumiendo que existe o similar
+import 'reset_password_screen.dart';
+import 'login_screen.dart';
+import '../../core/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -108,8 +110,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Mi Perfil', style: TextStyle(fontWeight: FontWeight.bold))),
-        body: const Center(child: Text("Inicia sesión para ver tu perfil.")),
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Mi Perfil', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: AppColors.background,
+          elevation: 0,
+          centerTitle: true,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.account_circle_outlined, size: 100, color: Colors.white24),
+                const SizedBox(height: 24),
+                const Text(
+                  "Tu Perfil",
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "Inicia sesión para gestionar tus boletos, guardar eventos y personalizar tus intereses.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                ),
+                const SizedBox(height: 40),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    elevation: 5,
+                  ),
+                  child: const Text(
+                    "INICIAR SESIÓN",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    // Navigate directly to registration form
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen(isRegister: true, initialRole: 'cliente')));
+                  },
+                  child: const Text(
+                    "¿No tienes cuenta? Regístrate",
+                    style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 

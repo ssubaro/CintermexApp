@@ -6,7 +6,8 @@ import '../widgets/event_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SavedScreen extends StatefulWidget {
-  const SavedScreen({super.key});
+  final VoidCallback? onExplore;
+  const SavedScreen({super.key, this.onExplore});
 
   @override
   State<SavedScreen> createState() => _SavedScreenState();
@@ -77,7 +78,11 @@ class _SavedScreenState extends State<SavedScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             ),
             onPressed: () {
-              Navigator.popUntil(context, (route) => route.isFirst);
+              if (widget.onExplore != null) {
+                widget.onExplore!();
+              } else {
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
             },
             child: const Text("Explorar eventos", style: TextStyle(color: Colors.white)),
           )

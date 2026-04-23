@@ -21,6 +21,7 @@ class Ticket {
   final DateTime? eventDate;
   final String? eventLocation;
   final DateTime? selectedDate;
+  final String? ticketTypeName;
 
   Ticket({
     required this.id,
@@ -43,6 +44,7 @@ class Ticket {
     this.usedBy,
     this.source,
     this.scheduleId,
+    this.ticketTypeName,
   });
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
@@ -76,6 +78,9 @@ class Ticket {
           json['events'] != null ? json['events']['location'] as String : null,
       selectedDate: json['selected_date'] != null
           ? DateTime.parse(json['selected_date'] as String)
+          : null,
+      ticketTypeName: json['ticket_types'] != null
+          ? json['ticket_types']['name'] as String
           : null,
     );
   }

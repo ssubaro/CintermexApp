@@ -9,7 +9,14 @@ import 'forgot_password_screen.dart';
 import '../widgets/status_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final bool isRegister;
+  final String? initialRole;
+
+  const LoginScreen({
+    super.key,
+    this.isRegister = false,
+    this.initialRole,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -56,6 +63,15 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _isLogin = !widget.isRegister;
+    if (widget.initialRole != null) {
+      _selectedRole = widget.initialRole!;
+      _isRoleSelected = true;
+    } else if (widget.isRegister) {
+      // Si es registro y no hay rol, por defecto mostramos el form de cliente
+      _selectedRole = 'cliente';
+      _isRoleSelected = true;
+    }
     _loadCategories();
   }
 
