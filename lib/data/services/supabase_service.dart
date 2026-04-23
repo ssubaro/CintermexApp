@@ -531,6 +531,7 @@ class SupabaseService {
     required String customerName,
     required String userId,
     required String selectedDate,
+    String? ticketTypeId,
   }) async {
     try {
       final session = _client.auth.currentSession;
@@ -547,6 +548,7 @@ class SupabaseService {
           'customer_name': customerName,
           'user_id': userId,
           'selected_date': selectedDate,
+          'ticket_type_id': ticketTypeId,
         },
       );
 

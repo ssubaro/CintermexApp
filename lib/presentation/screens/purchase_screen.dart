@@ -122,84 +122,97 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
         customerName: customerName,
         userId: user.id,
         selectedDate: _selectedDate!.toIso8601String(),
+        ticketTypeId: _selectedTicketType?.id,
       );
 
-      final uri = Uri.parse(checkoutUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      setState(() => _isProcessing = false);
 
-        if (mounted) {
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              backgroundColor: AppColors.darkGrey,
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blueAccent.withOpacity(0.1),
-                        shape: BoxShape.circle,
+      if (mounted) {
+        final uri = Uri.parse(checkoutUrl);
+        
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: AppColors.darkGrey,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryRed.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.account_balance_wallet_outlined, size: 60, color: AppColors.primaryRed),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Portal de Pago Listo',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Para completar tu compra de forma segura, haz clic en el botón de abajo para ir al portal oficial de Conekta.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 15, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryRed,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Icon(Icons.payment, size: 60, color: Colors.blueAccent),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      '¡Pago en proceso!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Se ha abierto la página de pago de Conekta. Una vez que lo realices, tus boletos aparecerán en tu sección personal.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryRed,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('VER MIS BOLETOS', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.white38),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('REGRESAR A LA COMPRA', 
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.open_in_new, size: 20),
+                          SizedBox(width: 10),
+                          Text('IR A PAGAR AHORA', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(color: Colors.white12),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '¿Ya completaste tu pago?',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+                      );
+                    },
+                    child: const Text('VER MIS BOLETOS', 
+                      style: TextStyle(color: AppColors.primaryRed, fontWeight: FontWeight.bold)),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('CANCELAR', 
+                      style: TextStyle(color: Colors.grey)),
+                  ),
+                ],
               ),
             ),
-          );
-        }
+          ),
+        );
       } else {
         throw 'No se pudo abrir la página de pago';
       }

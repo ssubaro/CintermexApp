@@ -57,6 +57,7 @@ Deno.serve(async (req) => {
             customer_name,
             user_id,
             selected_date,
+            ticket_type_id,
             success_url,
             failure_url
         } = rawBody
@@ -78,6 +79,7 @@ Deno.serve(async (req) => {
                     user_id: user_id,
                     event_id: event_id,
                     selected_date: selected_date,
+                    ticket_type_id: ticket_type_id,
                     quantity: quantity.toString()
                 },
                 customer_info: {

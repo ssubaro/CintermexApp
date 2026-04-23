@@ -13,15 +13,20 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  late final List<Widget> _screens;
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const AgendaScreen(),
-    const Center(child: Text("Buscar", style: TextStyle(color: Colors.white))), // Placeholder
-    const SavedScreen(),
-    const ProfileScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      const HomeScreen(),
+      const AgendaScreen(),
+      const Center(child: Text("Buscar", style: TextStyle(color: Colors.white))), // Placeholder
+      SavedScreen(onExplore: () => setState(() => _currentIndex = 0)),
+      const ProfileScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
