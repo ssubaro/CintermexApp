@@ -6,6 +6,7 @@ import '../screens/login_screen.dart';
 import '../screens/saved_screen.dart';
 import '../screens/my_tickets_screen.dart';
 import '../widgets/estacionamiento_widget.dart';
+import '../screens/mapa_cintermex_screen.dart';
 
 class CustomDrawer extends StatelessWidget {
   const CustomDrawer({super.key});
@@ -21,6 +22,13 @@ class CustomDrawer extends StatelessWidget {
     final url = Uri.parse('mailto:soporte@cintermex.com?subject=Soporte%20CintermexGO');
     if (await canLaunchUrl(url)) {
       await launchUrl(url);
+    }
+  }
+
+  Future<void> _launchSocial(String urlString) async {
+    final url = Uri.parse(urlString);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -110,9 +118,8 @@ class CustomDrawer extends StatelessWidget {
                     icon: Icons.map_outlined,
                     title: 'Mapa de Cintermex',
                     onTap: () {
-                       // Placeholder map screen
                        Navigator.pop(context);
-                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mapa en desarrollo')));
+                       Navigator.push(context, MaterialPageRoute(builder: (_) => const MapaCintermexScreen()));
                     },
                   ),
                   _buildDrawerItem(
@@ -150,6 +157,40 @@ class CustomDrawer extends StatelessWidget {
                       Navigator.pop(context);
                       _launchEmail();
                     },
+                  ),
+                  const Divider(color: Colors.white12, height: 24),
+
+                  // --- REDES SOCIALES ---
+                  _buildSectionTitle('SÍGUENOS'),
+                  _buildDrawerItem(
+                    icon: Icons.alternate_email,
+                    title: 'X (Twitter)',
+                    onTap: () => _launchSocial('https://x.com/cintermexmty'),
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.facebook,
+                    title: 'Facebook',
+                    onTap: () => _launchSocial('https://www.facebook.com/cintermex'),
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.camera_alt_outlined,
+                    title: 'Instagram',
+                    onTap: () => _launchSocial('https://www.instagram.com/cintermex/'),
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.play_circle_outline,
+                    title: 'YouTube',
+                    onTap: () => _launchSocial('https://www.youtube.com/user/CintermexMonterrey'),
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.music_note,
+                    title: 'TikTok',
+                    onTap: () => _launchSocial('https://www.tiktok.com/@Cintermex'),
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.work_outline,
+                    title: 'LinkedIn',
+                    onTap: () => _launchSocial('https://www.linkedin.com/company/cintermex/mycompany/?viewAsMember=true'),
                   ),
                   const Divider(color: Colors.white12, height: 24),
 

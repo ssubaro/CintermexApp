@@ -566,6 +566,22 @@ class SupabaseService {
     }
   }
 
+  /// Obtiene todos los eventos activos ordenados por título (A-Z).
+  /// Usado por la pantalla de búsqueda.
+  Future<List<Event>> getAllActiveEvents() async {
+    final response = await _client.from('events').select('''
+          *,
+          venue_locations(*),
+          event_schedules(*),
+          event_categories(categories(*))
+        ''')
+        .eq('status', 'active')
+        .order('title', ascending: true);
+
+    final data = response as List<dynamic>;
+    return data.map((json) => Event.fromJson(json)).toList();
+  }
+
   // --- Organizer & Admin Extension ---
 
   Future<List<Event>> getOrganizerEvents(String organizerId) async {

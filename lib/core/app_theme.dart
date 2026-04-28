@@ -32,8 +32,8 @@ class AppTheme {
     return ThemeData(
       brightness: Brightness.light,
       primaryColor: AppColors.primaryRed,
-      scaffoldBackgroundColor: AppColors.lightBackground,
-      cardColor: AppColors.lightSurface,
+      scaffoldBackgroundColor: const Color(0xFFF2F2F2),
+      cardColor: Colors.white,
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.primaryRed,
         foregroundColor: Colors.white,
@@ -42,12 +42,36 @@ class AppTheme {
       colorScheme: const ColorScheme.light(
         primary: AppColors.primaryRed,
         secondary: AppColors.primaryRed,
-        surface: AppColors.lightSurface,
+        surface: Colors.white,
+      ),
+      textTheme: const TextTheme(
+        bodyLarge: TextStyle(color: Color(0xFF1A1A1A)),
+        bodyMedium: TextStyle(color: Color(0xFF1A1A1A)),
+        bodySmall: TextStyle(color: Color(0xFF6B6B6B)),
+        headlineSmall: TextStyle(color: Color(0xFF1A1A1A)),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: const Color(0xFFE8E8E8),
         labelStyle: const TextStyle(color: Colors.black87),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      dividerColor: const Color(0xFFE0E0E0),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primaryRed, width: 1.5),
+        ),
+        hintStyle: const TextStyle(color: Color(0xFFAAAAAA)),
       ),
     );
   }
