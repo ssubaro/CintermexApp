@@ -42,6 +42,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = context.watch<ThemeProvider>().isDarkMode;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configuración'),
@@ -51,62 +54,179 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 16),
         children: [
-          // ─── Sección 1: Preferencias ───
-          _sectionHeader('Preferencias'),
-          _settingsTile(
-            icon: Icons.palette_outlined,
-            title: 'Tema de la App',
-            subtitle: context.watch<ThemeProvider>().isDarkMode ? 'Modo Oscuro' : 'Modo Claro',
-            trailing: Switch(
-              value: context.watch<ThemeProvider>().isDarkMode,
-              activeThumbColor: AppColors.primaryRed,
-              onChanged: (_) => context.read<ThemeProvider>().toggleTheme(),
+          // ─── Sección 1: Apariencia ───
+          _sectionHeader(context, 'Apariencia'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.palette_outlined, color: AppColors.primaryRed, size: 22),
+                      const SizedBox(width: 16),
+                      Text('Tema de la App',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: theme.textTheme.bodyLarge?.color,
+                          )),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      // Oscuro
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            if (!isDark) context.read<ThemeProvider>().toggleTheme();
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.primaryRed
+                                  : (isDark ? Colors.white12 : Colors.black12),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark
+                                    ? AppColors.primaryRed
+                                    : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.dark_mode,
+                                  color: isDark ? Colors.white : Colors.grey,
+                                  size: 28,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Oscuro',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : Colors.grey,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Claro
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            if (isDark) context.read<ThemeProvider>().toggleTheme();
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: !isDark
+                                  ? AppColors.primaryRed
+                                  : Colors.white10,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: !isDark
+                                    ? AppColors.primaryRed
+                                    : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.light_mode,
+                                  color: !isDark ? Colors.white : Colors.grey,
+                                  size: 28,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Claro',
+                                  style: TextStyle(
+                                    color: !isDark ? Colors.white : Colors.grey,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           _settingsTile(
+            context: context,
             icon: Icons.language,
             title: 'Idioma',
             subtitle: _selectedLanguage,
-            trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+            trailing: Icon(Icons.chevron_right,
+                color: theme.textTheme.bodySmall?.color),
             onTap: () => _showLanguagePicker(),
           ),
 
           const SizedBox(height: 8),
           // ─── Sección 2: Cuenta y Seguridad ───
-          _sectionHeader('Cuenta y Seguridad'),
+          _sectionHeader(context, 'Cuenta y Seguridad'),
           _settingsTile(
+            context: context,
             icon: Icons.devices_outlined,
             title: 'Administrar Sesiones',
             subtitle: 'Esta sesión está activa',
-            trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+            trailing: Icon(Icons.chevron_right,
+                color: theme.textTheme.bodySmall?.color),
             onTap: () => _showSessionsInfo(),
           ),
 
           const SizedBox(height: 8),
           // ─── Sección 3: Ayuda y Soporte ───
-          _sectionHeader('Ayuda y Soporte'),
+          _sectionHeader(context, 'Ayuda y Soporte'),
           _settingsTile(
+            context: context,
             icon: Icons.help_outline,
             title: 'Centro de Ayuda / FAQ',
             subtitle: '${_faq.length} preguntas frecuentes',
-            trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+            trailing: Icon(Icons.chevron_right,
+                color: theme.textTheme.bodySmall?.color),
             onTap: () => _showFAQ(),
           ),
           _settingsTile(
+            context: context,
             icon: Icons.chat_bubble_outline,
             title: 'Contacto con Soporte',
             subtitle: 'WhatsApp o correo electrónico',
-            trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+            trailing: Icon(Icons.chevron_right,
+                color: theme.textTheme.bodySmall?.color),
             onTap: () => _showContactOptions(),
           ),
 
           const SizedBox(height: 8),
           // ─── Sección 4: Legal ───
-          _sectionHeader('Legal'),
+          _sectionHeader(context, 'Legal'),
           _settingsTile(
+            context: context,
             icon: Icons.article_outlined,
             title: 'Términos y Condiciones',
-            trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+            trailing: Icon(Icons.chevron_right,
+                color: theme.textTheme.bodySmall?.color),
             onTap: () => _showTermsAndConditions(),
           ),
 
@@ -115,7 +235,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(
             'Cintermex App  v$_appVersion',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.grey, fontSize: 13),
+            style: TextStyle(
+                color: theme.textTheme.bodySmall?.color, fontSize: 13),
           ),
           const SizedBox(height: 32),
         ],
@@ -123,7 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _sectionHeader(String title) {
+  Widget _sectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Text(
@@ -139,19 +260,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _settingsTile({
+    required BuildContext context,
     required IconData icon,
     required String title,
     String? subtitle,
     Widget? trailing,
     VoidCallback? onTap,
   }) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFF2C2C2C),
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -162,9 +285,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: theme.textTheme.bodyLarge?.color)),
                   if (subtitle != null)
-                    Text(subtitle, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                    Text(subtitle,
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: theme.textTheme.bodySmall?.color)),
                 ],
               ),
             ),
@@ -181,7 +311,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      backgroundColor: const Color(0xFF2C2C2C),
       builder: (_) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -215,7 +344,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2C2C2C),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Sesiones Activas', style: TextStyle(fontWeight: FontWeight.bold)),
         content: Column(
@@ -236,7 +364,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Este dispositivo', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text('Sesión activa ahora', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text('Sesión activa ahora', style: TextStyle(fontSize: 12)),
                     ],
                   ),
                 ],
@@ -245,7 +373,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 12),
             const Text(
               'Para mayor seguridad, cierra la sesión desde cualquier dispositivo que no reconozcas desde "Cerrar Sesión" en tu perfil.',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
+              style: TextStyle(fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ],
@@ -274,15 +402,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: _faq.map((item) => Card(
-              color: const Color(0xFF2C2C2C),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               margin: const EdgeInsets.only(bottom: 12),
               child: ExpansionTile(
                 iconColor: AppColors.primaryRed,
-                collapsedIconColor: Colors.white54,
                 title: Text(item['q'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                 childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                children: [Text(item['a'], style: const TextStyle(color: Colors.grey))],
+                children: [Text(item['a'])],
               ),
             )).toList(),
           ),

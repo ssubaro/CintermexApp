@@ -3,6 +3,7 @@ import '../../core/app_colors.dart';
 import 'home_screen.dart';
 import 'agenda_screen.dart';
 import 'saved_screen.dart';
+import 'search_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class _MainScreenState extends State<MainScreen> {
     _screens = [
       const HomeScreen(),
       const AgendaScreen(),
-      const Center(child: Text("Buscar", style: TextStyle(color: Colors.white))), // Placeholder
+      const SearchScreen(),
       SavedScreen(onExplore: () => setState(() => _currentIndex = 0)),
       const ProfileScreen(),
     ];

@@ -8,6 +8,7 @@ import 'home_screen.dart';
 import 'my_tickets_screen.dart';
 import 'reset_password_screen.dart';
 import 'login_screen.dart';
+import 'settings_screen.dart';
 import '../../core/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -327,11 +328,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       children: [
                         ListTile(
+                          leading: const Icon(Icons.settings_outlined, color: Colors.white),
+                          title: const Text('Configuración', style: TextStyle(color: Colors.white)),
+                          trailing: const Icon(Icons.chevron_right, color: Colors.white54),
+                          onTap: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                          },
+                        ),
+                        const Divider(color: Colors.white12, height: 1),
+                        ListTile(
                           leading: const Icon(Icons.lock_outline, color: Colors.white),
                           title: const Text('Cambiar Contraseña', style: TextStyle(color: Colors.white)),
                           trailing: const Icon(Icons.chevron_right, color: Colors.white54),
                           onTap: () {
-                             // Assuming standard change password flow
                              Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
                           },
                         ),
