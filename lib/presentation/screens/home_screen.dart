@@ -94,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error fetching data: $e');
+      debugPrint('Error fetching data: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -512,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
 
                 if (snapshot.hasError) {
-                  return Center(child: Text("Error: ${snapshot.error}"));
+                  return const Center(child: Text('Error cargando eventos'));
                 }
 
                 final events = snapshot.data ?? [];

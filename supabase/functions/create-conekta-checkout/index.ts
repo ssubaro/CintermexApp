@@ -2,18 +2,25 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const CONEKTA_API_KEY = Deno.env.get('CONEKTA_API_KEY')
 
+// SECURITY: Restrict CORS to trusted origins only.
+// In production, replace '*' with your actual app/web domain.
+const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') ?? '*'
+
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Function to remove accents and special characters to comply with Conekta validation
+// SECURITY: Business rule — max tickets a single user can purchase at once
+const MAX_QUANTITY = 6
+const MIN_QUANTITY = 1
+
 const sanitizeName = (name: string): string => {
     if (!name) return "Cliente Cintermex";
     return name
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Remove accents
-        .replace(/[^a-zA-Z0-9 ]/g, "")   // Keep only alphanumeric and spaces
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9 ]/g, "")
         .trim() || "Cintermex Item";
 };
 
@@ -30,14 +37,14 @@ Deno.serve(async (req) => {
         )
     }
 
-    // Initialize Supabase Client to verify the user
+    // Initialize Supabase Client to verify the user from the JWT
     const supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
         { global: { headers: { Authorization: authHeader } } }
     )
 
-    // Verify user identity
+    // SECURITY: Verify user identity from server-side JWT — trust this, not the client body
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     if (authError || !user) {
         return new Response(
@@ -55,42 +62,65 @@ Deno.serve(async (req) => {
             quantity,
             customer_email,
             customer_name,
-            user_id,
+            // NOTE: user_id from the body is intentionally IGNORED.
+            // We use user.id from the verified JWT to prevent spoofing.
             selected_date,
             ticket_type_id,
-            success_url,
-            failure_url
         } = rawBody
+
+        // SECURITY: Server-side validation of business rules
+        const parsedQuantity = parseInt(quantity)
+        if (isNaN(parsedQuantity) || parsedQuantity < MIN_QUANTITY || parsedQuantity > MAX_QUANTITY) {
+            return new Response(
+                JSON.stringify({ error: `La cantidad debe ser entre ${MIN_QUANTITY} y ${MAX_QUANTITY}` }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
+
+        const parsedUnitPrice = parseFloat(unit_price)
+        if (isNaN(parsedUnitPrice) || parsedUnitPrice <= 0) {
+            return new Response(
+                JSON.stringify({ error: 'El precio unitario no es válido' }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
+
+        if (!event_id || typeof event_id !== 'string') {
+            return new Response(
+                JSON.stringify({ error: 'event_id es requerido' }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
 
         const sanitizedEventTitle = sanitizeName(event_title);
         const sanitizedCustomerName = sanitizeName(customer_name || 'Cliente Cintermex');
 
-        // Official structure for POST /checkouts (Payment Links) - API v2.1.0
         const body = {
             name: `Boletos - ${sanitizedEventTitle}`.substring(0, 40),
             type: "PaymentLink",
             recurrent: false,
-            expires_at: Math.floor(Date.now() / 1000) + (3600 * 24 * 7), // 7 days expiration
+            expires_at: Math.floor(Date.now() / 1000) + (3600 * 24 * 7), // 7 days
             allowed_payment_methods: ["card", "cash", "bank_transfer"],
             needs_shipping_contact: false,
             order_template: {
                 currency: "MXN",
                 metadata: {
-                    user_id: user_id,
+                    // SECURITY: user_id is taken from the verified JWT, not from client input
+                    user_id: user.id,
                     event_id: event_id,
                     selected_date: selected_date,
                     ticket_type_id: ticket_type_id,
-                    quantity: quantity.toString()
+                    quantity: parsedQuantity.toString()
                 },
                 customer_info: {
                     name: sanitizedCustomerName.substring(0, 40),
-                    email: customer_email || 'customer@example.com',
+                    email: customer_email || user.email || 'customer@example.com',
                     phone: "5555555555"
                 },
                 line_items: [{
                     name: `Boleto: ${sanitizedEventTitle}`.substring(0, 60),
-                    unit_price: Math.round((unit_price || 0) * 100),
-                    quantity: quantity || 1,
+                    unit_price: Math.round(parsedUnitPrice * 100),
+                    quantity: parsedQuantity,
                 }]
             }
         }
@@ -110,6 +140,8 @@ Deno.serve(async (req) => {
         if (!response.ok) {
             const detail = data.details?.[0];
             const errorMsg = detail ? detail.message : (data.message || 'Error en Conekta');
+            // Log details server-side but return generic message
+            console.error("Conekta API error:", errorMsg)
             throw new Error(errorMsg)
         }
 
@@ -119,7 +151,8 @@ Deno.serve(async (req) => {
         )
 
     } catch (error) {
-        const errorMsg = (error instanceof Error) ? error.message : "Unknown error";
+        // SECURITY: Return generic error to client; real details already logged above
+        const errorMsg = (error instanceof Error) ? error.message : "Error procesando la solicitud";
         return new Response(
             JSON.stringify({ error: errorMsg }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

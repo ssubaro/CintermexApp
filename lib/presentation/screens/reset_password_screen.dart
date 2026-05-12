@@ -40,9 +40,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La contraseña debe tener al menos 6 caracteres')),
+        const SnackBar(content: Text('La contraseña debe tener al menos 8 caracteres')),
       );
       return;
     }
@@ -122,7 +122,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'La contraseña debe tener al menos 6 caracteres.',
+                'La contraseña debe tener al menos 8 caracteres.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),

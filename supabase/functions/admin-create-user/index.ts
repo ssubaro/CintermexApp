@@ -1,7 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// SECURITY: Restrict CORS to trusted origins. Set ALLOWED_ORIGIN in Supabase secrets.
+const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') ?? '*'
+
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
@@ -80,8 +83,21 @@ Deno.serve(async (req) => {
         )
 
     } catch (error) {
+        // SECURITY: Log the real error server-side, return a generic message to the client
+        const detail = error instanceof Error ? error.message : String(error)
+        console.error('admin-create-user error:', detail)
+        // Expose only known-safe messages (auth/validation) to the caller
+        const safeMessages = [
+            'No authorization header',
+            'Invalid token',
+            'Unauthorized: Only admins can create users',
+            'Email and password are required',
+        ]
+        const clientMessage = safeMessages.includes(detail)
+            ? detail
+            : 'No se pudo crear el usuario. Verifica los datos e intenta nuevamente.'
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: clientMessage }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         )
     }

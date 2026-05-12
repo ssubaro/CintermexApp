@@ -72,7 +72,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading form data: $e');
+      debugPrint('Error loading form data: $e');
       setState(() => _isLoading = false);
     }
   }

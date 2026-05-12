@@ -68,7 +68,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
         _isLoadingTypes = false;
       });
     } catch (e) {
-      print('Error fetching initial data: $e');
+      debugPrint('Error fetching initial data: $e');
       setState(() => _isLoadingTypes = false);
     }
   }

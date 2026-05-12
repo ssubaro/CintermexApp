@@ -64,7 +64,7 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     } catch (e) {
-      print('Error fetching events for search: $e');
+      debugPrint('Error fetching events for search: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }

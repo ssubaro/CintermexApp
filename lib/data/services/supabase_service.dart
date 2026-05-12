@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:rxdart/rxdart.dart';
 import '../models/event_model.dart';
 import '../models/ticket_model.dart';
@@ -29,7 +30,7 @@ class SupabaseService {
       );
       _eventsSubject.add(events);
     } catch (e) {
-      print('Error al refrescar eventos: $e');
+      debugPrint('Error al refrescar eventos: $e');
       _eventsSubject.addError(e);
     }
   }
@@ -140,7 +141,7 @@ class SupabaseService {
       } catch (e) {
         // El insert puede fallar si RLS bloquea la escritura antes de confirmación.
         // El trigger de Supabase lo compensará al confirmar el correo.
-        print(
+        debugPrint(
             'Note: Direct profile insert failed (expected if email confirm pending): $e');
       }
     }
@@ -161,7 +162,7 @@ class SupabaseService {
           .single();
       return response['role'] as String?;
     } catch (e) {
-      print('Error fetching user role: $e');
+      debugPrint('Error fetching user role: $e');
       return null;
     }
   }
@@ -310,7 +311,7 @@ class SupabaseService {
       final data = response as List<dynamic>;
       return data.map((json) => Announcement.fromJson(json)).toList();
     } catch (e) {
-      print('Avisos no encontrados o tabla inexistente: $e');
+      debugPrint('Avisos no encontrados o tabla inexistente: $e');
       return []; // Return empty list gracefully
     }
   }
@@ -558,10 +559,10 @@ class SupabaseService {
 
       return response.data['url'] as String;
     } on FunctionException catch (fe) {
-      print('Error de Supabase Function: ${fe.status} - ${fe.details}');
+      debugPrint('Error de Supabase Function: ${fe.status}');
       rethrow;
     } catch (e) {
-      print('Error en createConektaCheckout: $e');
+      debugPrint('Error en createConektaCheckout: $e');
       rethrow;
     }
   }
@@ -574,9 +575,7 @@ class SupabaseService {
           venue_locations(*),
           event_schedules(*),
           event_categories(categories(*))
-        ''')
-        .eq('status', 'active')
-        .order('title', ascending: true);
+        ''').eq('status', 'active').order('title', ascending: true);
 
     final data = response as List<dynamic>;
     return data.map((json) => Event.fromJson(json)).toList();
