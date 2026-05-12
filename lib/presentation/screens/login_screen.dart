@@ -84,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     } catch (e) {
-      print('Error loading categories: $e');
+      debugPrint('Error loading categories: $e');
     }
   }
 
@@ -118,9 +118,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La contraseña debe tener al menos 6 caracteres')),
+        const SnackBar(content: Text('La contraseña debe tener al menos 8 caracteres')),
       );
       return;
     }
@@ -514,7 +514,7 @@ class _LoginScreenState extends State<LoginScreen> {
           onChanged: (val) {
             setState(() {
               _isPasswordDirty = true;
-              _isPasswordValid = val.length >= 6;
+              _isPasswordValid = val.length >= 8;
               // También re-validar confirmación si ya tenía algo
               _isConfirmPasswordValid = val == _confirmPasswordController.text;
             });

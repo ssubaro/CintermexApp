@@ -40,7 +40,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _pendingEvents = events;
       });
     } catch (e) {
-      print('Error loading pending events: $e');
+      debugPrint('Error loading pending events: $e');
     }
   }
 
@@ -297,8 +297,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryRed),
               onPressed: isSaving ? null : () async {
-                if (emailController.text.isEmpty || passwordController.text.length < 6) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Por favor completa los datos correctamente')));
+                if (emailController.text.isEmpty || passwordController.text.length < 8) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('La contraseña debe tener al menos 8 caracteres')));
                   return;
                 }
 

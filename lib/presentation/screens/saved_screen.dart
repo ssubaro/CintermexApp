@@ -51,7 +51,7 @@ class _SavedScreenState extends State<SavedScreen> {
         });
       }
     } catch (e) {
-      print("Error fetching saved events: $e");
+      debugPrint('Error fetching saved events: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
